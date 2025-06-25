@@ -324,73 +324,63 @@ async function generateAIStory() {
         showSection('api-setup');
         return;
     }
-    
+
     const theme = document.getElementById('story-theme').value.trim();
     const characters = document.getElementById('story-characters').value.trim();
     const setting = document.getElementById('story-setting').value.trim();
-    
+
     if (!theme) {
         showToast('אנא הכנס נושא לסיפור', 'error');
         return;
     }
-    
+
     showToast('יוצר סיפור אוטומטי...', 'info');
-    
+
     try {
         const prompt = `צור סיפור קצר בעברית על ${theme}. 
-        דמויות: ${characters || 'דמויות מעניינות'}
-        רקע: ${setting || 'מקום מעניין'}
-        הסיפור צריך להיות מתאים לקומיקס עם 4-6 פנלים.
-        כתוב את הסיפור בצורה ברורה עם משפטים קצרים.`;
-        
-const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-    })
-});
+דמויות: ${characters || 'דמויות מעניינות'}
+רקע: ${setting || 'מקום מעניין'}
+הסיפור צריך להיות מתאים לקומיקס עם 4-6 פנלים.
+כתוב את הסיפור בצורה ברורה עם משפטים קצרים.`;
 
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: prompt
-                    }]
-                }]
+                contents: [{ parts: [{ text: prompt }] }]
             })
         });
-        
+
         if (!response.ok) {
             throw new Error('Failed to generate story');
         }
-        
+
         const data = await response.json();
-        const generatedStory = data.candidates[0].content.parts[0].text;
-        
-        // Set the generated story in the text area
+        const generatedStory = data.candidates[0]?.content?.parts?.[0]?.text;
+
+        if (!generatedStory) {
+            throw new Error('No story received from the API');
+        }
+
         document.getElementById('story-text').value = generatedStory;
-        
+
         // Switch to manual mode to show the generated story
         document.getElementById('creation-type').value = 'manual';
         toggleCreationMode();
-        
+
         // Process the generated story
         await processStory();
-        
+
         showToast('סיפור נוצר בהצלחה!', 'success');
-        
     } catch (error) {
         console.error('Error generating story:', error);
         showToast('שגיאה ביצירת הסיפור', 'error');
     }
 }
+
 
 function displayStoryOutput(panels) {
     const outputDiv = document.getElementById('story-output');
