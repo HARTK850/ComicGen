@@ -240,12 +240,12 @@ async function validateApiKey() {
 
     try {
         const response = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent',
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', // שימו לב, שיניתי ל-latest
             {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${key}`
+                    'x-goog-api-key': key // <--- זה השינוי העיקרי כאן!
                 },
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: 'Hello' }] }]
@@ -260,10 +260,14 @@ async function validateApiKey() {
             showApiStatus('המפתח תקין ונשמר בהצלחה!', 'success');
             showToast('מפתח API נשמר בהצלחה', 'success');
         } else {
-            throw new Error('Invalid API key');
+            // טיפול טוב יותר בשגיאות מה-API
+            const errorData = await response.json();
+            console.error('API Error Response:', errorData);
+            throw new Error(`Invalid API key or API error: ${errorData.error?.message || response.statusText}`);
         }
     } catch (error) {
-        showApiStatus('המפתח לא תקין. אנא בדוק ונסה שוב.', 'error');
+        console.error('Error validating API key:', error);
+        showApiStatus(`המפתח לא תקין. אנא בדוק ונסה שוב. ${error.message}`, 'error');
         showToast('שגיאה בבדיקת המפתח', 'error');
     }
 }
@@ -343,11 +347,11 @@ async function generateAIStory() {
 הסיפור צריך להיות מתאים לקומיקס עם 4-6 פנלים.
 כתוב את הסיפור בצורה ברורה עם משפטים קצרים.`;
 
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', { // שינוי ל-latest
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
+                'x-goog-api-key': apiKey // <--- גם כאן!
             },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }]
@@ -355,7 +359,9 @@ async function generateAIStory() {
         });
 
         if (!response.ok) {
-            throw new Error('Failed to generate story');
+            const errorData = await response.json();
+            console.error('API Error Response:', errorData);
+            throw new Error(`Failed to generate story: ${errorData.error?.message || response.statusText}`);
         }
 
         const data = await response.json();
@@ -367,17 +373,15 @@ async function generateAIStory() {
 
         document.getElementById('story-text').value = generatedStory;
 
-        // Switch to manual mode to show the generated story
         document.getElementById('creation-type').value = 'manual';
         toggleCreationMode();
 
-        // Process the generated story
         await processStory();
 
         showToast('סיפור נוצר בהצלחה!', 'success');
     } catch (error) {
         console.error('Error generating story:', error);
-        showToast('שגיאה ביצירת הסיפור', 'error');
+        showToast(`שגיאה ביצירת הסיפור: ${error.message}`, 'error');
     }
 }
 
