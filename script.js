@@ -343,7 +343,17 @@ async function generateAIStory() {
         הסיפור צריך להיות מתאים לקומיקס עם 4-6 פנלים.
         כתוב את הסיפור בצורה ברורה עם משפטים קצרים.`;
         
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+    })
+});
+
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
