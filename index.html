@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>יוצר הקומיקס העברי</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-spinner"></div>
+        <p>טוען את יוצר הקומיקס...</p>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-book-open"></i>
+                <span>יוצר הקומיקס העברי</span>
+            </div>
+            <div class="nav-menu">
+                <button class="nav-btn" onclick="showSection('home')">
+                    <i class="fas fa-home"></i>
+                    <span>בית</span>
+                </button>
+                <button class="nav-btn" onclick="showSection('api-setup')">
+                    <i class="fas fa-key"></i>
+                    <span>הגדרת API</span>
+                </button>
+                <button class="nav-btn" onclick="showSection('story-editor')">
+                    <i class="fas fa-edit"></i>
+                    <span>עורך סיפור</span>
+                </button>
+                <button class="nav-btn" onclick="showSection('comic-editor')">
+                    <i class="fas fa-images"></i>
+                    <span>עורך קומיקס</span>
+                </button>
+                <button class="nav-btn" onclick="showSection('feedback')">
+                    <i class="fas fa-star"></i>
+                    <span>משוב</span>
+                </button>
+                <button class="nav-btn admin-only" onclick="showSection('admin')" style="display: none;">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>ניהול</span>
+                </button>
+            </div>
+            <div class="nav-user">
+                <button class="user-btn" onclick="toggleUserMenu()">
+                    <i class="fas fa-user"></i>
+                </button>
+                <div class="user-menu" id="user-menu">
+                    <button onclick="showLoginModal()">התחברות</button>
+                    <button onclick="logout()">התנתקות</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Home Section -->
+        <section id="home" class="section active">
+            <div class="hero">
+                <div class="hero-content">
+                    <h1 class="hero-title">ברוכים הבאים ליוצר הקומיקס העברי</h1>
+                    <p class="hero-subtitle">צרו קומיקסים מדהימים בעברית עם בינה מלאכותית</p>
+                    <div class="hero-buttons">
+                        <button class="btn btn-primary" onclick="showSection('story-editor')">
+                            <i class="fas fa-rocket"></i>
+                            התחל ליצור
+                        </button>
+                        <button class="btn btn-secondary" onclick="showSection('api-setup')">
+                            <i class="fas fa-cog"></i>
+                            הגדרות
+                        </button>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <div class="comic-preview">
+                        <div class="comic-panel">
+                            <div class="speech-bubble">שלום עולם!</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="features">
+                <h2>תכונות מתקדמות</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <i class="fas fa-magic"></i>
+                        <h3>יצירה אוטומטית</h3>
+                        <p>בינה מלאכותית ליצירת סיפורים וקומיקסים</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-palette"></i>
+                        <h3>סגנונות מגוונים</h3>
+                        <p>אנימה, ריאליסטי, קריקטורה ועוד</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-mobile-alt"></i>
+                        <h3>רספונסיבי</h3>
+                        <p>עובד מושלם בכל המכשירים</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-cloud"></i>
+                        <h3>שמירה בענן</h3>
+                        <p>הפרויקטים שלכם נשמרים בבטחה</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- API Setup Section -->
+        <section id="api-setup" class="section">
+            <div class="container">
+                <h2><i class="fas fa-key"></i> הגדרת מפתח API</h2>
+                <div class="api-setup-card">
+                    <div class="api-form">
+                        <div class="form-group">
+                            <label for="api-key">מפתח Gemini AI:</label>
+                            <div class="input-group">
+                                <input type="password" id="api-key" placeholder="הכנס את מפתח ה-API שלך">
+                                <button type="button" onclick="toggleApiKeyVisibility()" class="toggle-btn">
+                                    <i class="fas fa-eye" id="eye-icon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button onclick="validateApiKey()" class="btn btn-primary">
+                            <i class="fas fa-check"></i>
+                            בדוק ושמור
+                        </button>
+                        <div id="api-status" class="api-status"></div>
+                    </div>
+                    <div class="api-help">
+                        <h3>איך להשיג מפתח API?</h3>
+                        <ol>
+                            <li>היכנס ל-<a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a></li>
+                            <li>צור מפתח API חדש</li>
+                            <li>העתק את המפתח והדבק אותו כאן</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Story Editor Section -->
+        <section id="story-editor" class="section">
+            <div class="container">
+                <h2><i class="fas fa-edit"></i> עורך הסיפור</h2>
+                <div class="story-editor-container">
+                    <div class="story-controls">
+                        <div class="control-group">
+                            <label>סוג יצירה:</label>
+                            <select id="creation-type" onchange="toggleCreationMode()">
+                                <option value="manual">כתיבה ידנית</option>
+                                <option value="ai">יצירה אוטומטית</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>סגנון איור:</label>
+                            <select id="art-style">
+                                <option value="anime">אנימה</option>
+                                <option value="realistic">ריאליסטי</option>
+                                <option value="cartoon">קריקטורה</option>
+                                <option value="comic">קומיקס קלאסי</option>
+                                <option value="manga">מנגה</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Manual Story Input -->
+                    <div id="manual-input" class="input-section">
+                        <div class="form-group">
+                            <label for="story-text">הכנס את הסיפור שלך:</label>
+                            <textarea id="story-text" placeholder="כתוב כאן את הסיפור שלך... המערכת תחלק אותו אוטומטית לפנלים"></textarea>
+                        </div>
+                        <button onclick="processStory()" class="btn btn-primary">
+                            <i class="fas fa-magic"></i>
+                            צור פנלים
+                        </button>
+                    </div>
+
+                    <!-- AI Story Generation -->
+                    <div id="ai-input" class="input-section" style="display: none;">
+                        <div class="ai-prompts">
+                            <div class="form-group">
+                                <label for="story-theme">נושא הסיפור:</label>
+                                <input type="text" id="story-theme" placeholder="למשל: הרפתקה בחלל, סיפור אהבה, מתח">
+                            </div>
+                            <div class="form-group">
+                                <label for="story-characters">דמויות עיקריות:</label>
+                                <input type="text" id="story-characters" placeholder="למשל: גיבור צעיר, נסיכה, דרקון">
+                            </div>
+                            <div class="form-group">
+                                <label for="story-setting">רקע/מקום:</label>
+                                <input type="text" id="story-setting" placeholder="למשל: עיר עתידנית, יער קסום, בית ספר">
+                            </div>
+                        </div>
+                        <button onclick="generateAIStory()" class="btn btn-primary">
+                            <i class="fas fa-robot"></i>
+                            צור סיפור אוטומטי
+                        </button>
+                    </div>
+
+                    <div id="story-output" class="story-output"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Comic Editor Section -->
+        <section id="comic-editor" class="section">
+            <div class="container">
+                <h2><i class="fas fa-images"></i> עורך הקומיקס</h2>
+                <div class="comic-editor-container">
+                    <div class="editor-toolbar">
+                        <button onclick="addPanel()" class="btn btn-secondary">
+                            <i class="fas fa-plus"></i>
+                            הוסף פנל
+                        </button>
+                        <button onclick="saveProject()" class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            שמור פרויקט
+                        </button>
+                        <button onclick="downloadComic()" class="btn btn-success">
+                            <i class="fas fa-download"></i>
+                            הורד קומיקס
+                        </button>
+                    </div>
+                    
+                    <div id="comic-panels" class="comic-panels">
+                        <!-- Panels will be dynamically added here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Feedback Section -->
+        <section id="feedback" class="section">
+            <div class="container">
+                <h2><i class="fas fa-star"></i> משוב ודירוג</h2>
+                <div class="feedback-container">
+                    <div class="feedback-form">
+                        <div class="rating-section">
+                            <label>דרג את החוויה שלך:</label>
+                            <div class="star-rating" id="star-rating">
+                                <span class="star" data-rating="1">★</span>
+                                <span class="star" data-rating="2">★</span>
+                                <span class="star" data-rating="3">★</span>
+                                <span class="star" data-rating="4">★</span>
+                                <span class="star" data-rating="5">★</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="feedback-text">המשוב שלך:</label>
+                            <textarea id="feedback-text" placeholder="ספר לנו על החוויה שלך..."></textarea>
+                        </div>
+                        <button onclick="submitFeedback()" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i>
+                            שלח משוב
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Section -->
+        <section id="admin" class="section">
+            <div class="container">
+                <h2><i class="fas fa-chart-bar"></i> פאנל ניהול</h2>
+                <div class="admin-container">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <i class="fas fa-users"></i>
+                            <div class="stat-info">
+                                <h3 id="total-users">0</h3>
+                                <p>משתמשים רשומים</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-book"></i>
+                            <div class="stat-info">
+                                <h3 id="total-comics">0</h3>
+                                <p>קומיקסים נוצרו</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-star"></i>
+                            <div class="stat-info">
+                                <h3 id="avg-rating">0</h3>
+                                <p>דירוג ממוצע</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-comments"></i>
+                            <div class="stat-info">
+                                <h3 id="total-feedback">0</h3>
+                                <p>משובים התקבלו</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="admin-actions">
+                        <button onclick="generateReport()" class="btn btn-primary">
+                            <i class="fas fa-file-alt"></i>
+                            צור דוח
+                        </button>
+                        <button onclick="sendReportEmail()" class="btn btn-secondary">
+                            <i class="fas fa-envelope"></i>
+                            שלח דוח למייל
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeLoginModal()">&times;</span>
+            <h2>התחברות</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">שם משתמש:</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">סיסמה:</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">התחבר</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
