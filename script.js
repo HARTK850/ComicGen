@@ -239,30 +239,32 @@ async function validateApiKey() {
     showApiStatus('בודק את המפתח...', 'info');
 
     try {
+        // נשתמש במודל Gemini לבדיקה, כיוון שהוא מודל גנרי ובטוח יחסית
         const response = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', // שימו לב, שיניתי ל-latest
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
             {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-goog-api-key': key // <--- זה השינוי העיקרי כאן!
+                    'x-goog-api-key': key // <-- זה השינוי המרכזי!
                 },
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: 'Hello' }] }]
                 })
             }
         );
+
         if (response.ok) {
+            // הנתון הגלובלי apiKey חייב להיות זמין לשאר הפונקציות
+            window.apiKey = key; // או להגדיר אותו כמשתנה גלובלי אחר
             const encryptedKey = CryptoJS.AES.encrypt(key, 'comic-creator-secret').toString();
             localStorage.setItem('gemini_api_key', encryptedKey);
-            apiKey = key;
-
+            
             showApiStatus('המפתח תקין ונשמר בהצלחה!', 'success');
             showToast('מפתח API נשמר בהצלחה', 'success');
         } else {
-            // טיפול טוב יותר בשגיאות מה-API
             const errorData = await response.json();
-            console.error('API Error Response:', errorData);
+            console.error('API Error Response during validation:', errorData);
             throw new Error(`Invalid API key or API error: ${errorData.error?.message || response.statusText}`);
         }
     } catch (error) {
@@ -323,7 +325,7 @@ async function processStory() {
 }
 
 async function generateAIStory() {
-    if (!apiKey) {
+    if (!window.apiKey) { // לוודא שמשתמשים במשתנה הגלובלי שהוגדר
         showToast('אנא הגדר מפתח API תחילה', 'error');
         showSection('api-setup');
         return;
@@ -347,11 +349,11 @@ async function generateAIStory() {
 הסיפור צריך להיות מתאים לקומיקס עם 4-6 פנלים.
 כתוב את הסיפור בצורה ברורה עם משפטים קצרים.`;
 
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', { // שינוי ל-latest
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey // <--- גם כאן!
+                'x-goog-api-key': window.apiKey // <-- שינוי כאן ל-x-goog-api-key
             },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }]
@@ -360,7 +362,7 @@ async function generateAIStory() {
 
         if (!response.ok) {
             const errorData = await response.json();
-            console.error('API Error Response:', errorData);
+            console.error('API Error Response during story generation:', errorData);
             throw new Error(`Failed to generate story: ${errorData.error?.message || response.statusText}`);
         }
 
@@ -376,7 +378,7 @@ async function generateAIStory() {
         document.getElementById('creation-type').value = 'manual';
         toggleCreationMode();
 
-        await processStory();
+        await processStory(); // אם processStory מסתמך על טקסט הסיפור
 
         showToast('סיפור נוצר בהצלחה!', 'success');
     } catch (error) {
@@ -926,4 +928,92 @@ if (typeof Sortable === 'undefined') {
             });
         });
     };
+}
+
+
+
+async function generateAIImage(imageDescription) {
+    if (!window.apiKey) {
+        showToast('אנא הגדר מפתח API תחילה', 'error');
+        showSection('api-setup');
+        return;
+    }
+
+    if (!imageDescription || imageDescription.trim() === '') {
+        showToast('אנא ספק תיאור לתמונה', 'error');
+        return;
+    }
+
+    showToast('יוצר תמונה אוטומטית...', 'info');
+
+    try {
+        // ה-URL הספציפי למודלי יצירת תמונות של Imagen
+        // זהו ה-URL הספציפי של Vertex AI למודל Imagen.
+        // עבור משתמשי AI Studio, הוא לרוב יהיה נגיש דרך API מסוג REST.
+        // יש לוודא את הנתיב המדויק בתיעוד הרשמי של גוגל עבור המודל.
+        // דוגמה ל-URL עבור Imagen ב-Vertex AI:
+        // `https://<REGION>-aiplatform.googleapis.com/v1/projects/<PROJECT_ID>/locations/<REGION>/publishers/google/models/imagegeneration:predict`
+        // מכיוון שאנחנו משתמשים ב-Generative Language API (כמו במפתח ה-AI Studio),
+        // ננסה להשתמש בנתיב הכללי יותר, אך הוא דורש אימות.
+        // הנתיב הבא הוא הנפוץ עבור Imagen דרך Generative Language API (אבל יש לוודא!)
+        const IMAGEN_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/image-generation:generateImages'; 
+        // ייתכן שתצטרך:
+        // `https://generativelanguage.googleapis.com/v1beta/projects/<YOUR_PROJECT_ID>/locations/us-central1/publishers/google/models/imagegeneration:predict`
+        // אם אתה משתמש ב-Vertex AI במפורש. למשתמשי AI Studio הנתיב הראשון לרוב יעבוד.
+
+        const response = await fetch(IMAGEN_API_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': window.apiKey // אותו מפתח API
+            },
+            body: JSON.stringify({
+                // מבנה ה-body עבור Imagen
+                // זהו מבנה נפוץ עבור Imagen, ייתכן שינויים קלים
+                prompt: imageDescription, // התיאור של התמונה
+                // אפשר להוסיף פרמטרים נוספים כמו:
+                // aspect_ratio: "1:1",
+                // number_of_images: 1,
+                // quality: "standard",
+                // negative_prompt: "blurry, low quality"
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Image Generation API Error:', errorData);
+            throw new Error(`Failed to generate image: ${errorData.error?.message || response.statusText}`);
+        }
+
+        const data = await response.json();
+        // התגובה של Imagen בדרך כלל מכילה רשימת תמונות בפורמט Base64
+        // הנתיב המדויק לנתוני התמונה יכול להשתנות, בדוק את התיעוד!
+        const generatedImageBase64 = data.images?.[0]?.data; // דוגמה: יכול להיות `data.artifacts[0].base64` או דומה
+
+        if (!generatedImageBase64) {
+            throw new Error('No image data received from the API');
+        }
+
+        // כאן תוכל להשתמש ב-generatedImageBase64 כדי להציג את התמונה
+        // לדוגמה, להוסיף אותה לאלמנט <img> בדף ה-HTML
+        const imgElement = document.createElement('img');
+        imgElement.src = `data:image/jpeg;base64,${generatedImageBase64}`; // או image/png, תלוי בפורמט שהמודל מחזיר
+        imgElement.alt = imageDescription;
+        imgElement.style.maxWidth = '100%'; // כדי שהתמונה תתאים לגודל המסך
+        // מצא איפה תרצה להוסיף את התמונה, לדוגמה:
+        const imageOutputDiv = document.getElementById('image-output-container'); // וודא שיש לך div כזה ב-HTML
+        if (imageOutputDiv) {
+            imageOutputDiv.innerHTML = ''; // נקה תוכן קודם
+            imageOutputDiv.appendChild(imgElement);
+        } else {
+            document.body.appendChild(imgElement); // אם אין קונטיינר ספציפי
+        }
+
+        showToast('תמונה נוצרה בהצלחה!', 'success');
+        return imgElement.src; // להחזיר את נתיב התמונה אם תרצה להשתמש בו בהמשך
+    } catch (error) {
+        console.error('Error generating image:', error);
+        showToast(`שגיאה ביצירת תמונה: ${error.message}`, 'error');
+        return null;
+    }
 }
