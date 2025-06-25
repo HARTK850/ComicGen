@@ -246,7 +246,7 @@ async function validateApiKey() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-goog-api-key': key // <-- זה השינוי המרכזי!
+                    'x-goog-api-key': key 
                 },
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: 'Hello' }] }]
@@ -303,24 +303,44 @@ async function processStory() {
         return;
     }
     
-    showToast('מעבד את הסיפור...', 'info');
+    showToast('מעבד את הסיפור ומייצר תמונות...', 'info'); 
     
     // Split story into panels (simple logic - can be enhanced)
     const sentences = storyText.split(/[.!?]+/).filter(s => s.trim().length > 0);
     const panels = [];
     
     for (let i = 0; i < sentences.length; i++) {
-        panels.push({
+        const panel = {
             id: Date.now() + i,
             text: sentences[i].trim(),
             dialog: '',
-            imagePrompt: `${sentences[i].trim()} in ${document.getElementById('art-style').value} style`
-        });
+            imagePrompt: `${sentences[i].trim()} in ${document.getElementById('art-style').value} style`,
+            imageUrl: null, 
+            imageLoading: true 
+        };
+        panels.push(panel);
     }
     
     comicPanels = panels;
-    displayStoryOutput(panels);
-    showToast('הסיפור חולק לפנלים בהצלחה!', 'success');
+    displayStoryOutput(panels); 
+    showToast('הסיפור חולק לפנלים. יוצר תמונות...', 'info');
+
+    // **חדש**: לולאה לייצור תמונות עבור כל פנל
+    for (const panel of comicPanels) {
+        try {
+            const imageUrl = await generateAIImage(panel.imagePrompt);
+            panel.imageUrl = imageUrl;
+            panel.imageLoading = false; 
+            renderComicPanels(); 
+        } catch (error) {
+            console.error(`Error generating image for panel ${panel.id}:`, error);
+            panel.imageLoading = false;
+            panel.imageUrl = 'error'; 
+            showToast(`שגיאה ביצירת תמונה עבור פנל: ${panel.text.substring(0, 30)}...`, 'error');
+        }
+    }
+    
+    showToast('כל התמונות נוצרו (או שגיאה התרחשה בחלקן)!', 'success');
 }
 
 async function generateAIStory() {
@@ -352,7 +372,7 @@ async function generateAIStory() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-goog-api-key': window.apiKey // <-- חשוב להשתמש ב-window.apiKey
+                'x-goog-api-key': window.apiKey 
             },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }]
@@ -423,7 +443,9 @@ function addPanel() {
         id: Date.now(),
         text: 'טקסט חדש...',
         dialog: '',
-        imagePrompt: 'תיאור תמונה...'
+        imagePrompt: 'תיאור תמונה...',
+        imageUrl: null, 
+        imageLoading: false 
     };
     
     comicPanels.push(newPanel);
@@ -447,11 +469,28 @@ function renderComicPanels() {
     
     let html = '';
     comicPanels.forEach((panel, index) => {
+        // **שינוי כאן:** הצג את התמונה אם קיימת, אחרת אינדיקטור טעינה או הודעת שגיאה
+        let imageContent;
+        if (panel.imageLoading) {
+            imageContent = `<div class="image-placeholder loading"><i class="fas fa-spinner fa-spin"></i> טוען תמונה...</div>`;
+        } else if (panel.imageUrl && panel.imageUrl !== 'error') {
+            imageContent = `<img src="${panel.imageUrl}" alt="${panel.imagePrompt}" class="panel-generated-image">`;
+        } else if (panel.imageUrl === 'error') {
+             imageContent = `<div class="image-placeholder error"><i class="fas fa-exclamation-triangle"></i> שגיאת טעינת תמונה</div>`;
+        } else {
+            // אם אין תמונה וגם לא בטעינה, כנראה שטרם בוצעה קריאה ליצירת תמונה
+            imageContent = `<div class="image-placeholder"><i class="fas fa-image"></i> אין תמונה. לחץ כדי ליצור.</div>`;
+        }
+
+
         html += `
             <div class="comic-panel-item" data-panel-id="${panel.id}">
                 <div class="panel-header">
                     <span class="panel-number">פנל ${index + 1}</span>
                     <div class="panel-controls">
+                        <button class="panel-btn" onclick="generateImageForPanel(${panel.id})" title="צור תמונה לפנל זה">
+                            <i class="fas fa-magic"></i>
+                        </button>
                         <button class="panel-btn" onclick="editPanel(${panel.id})" title="ערוך">
                             <i class="fas fa-edit"></i>
                         </button>
@@ -461,14 +500,16 @@ function renderComicPanels() {
                     </div>
                 </div>
                 <div class="panel-content">
-                    <div class="panel-text">${panel.text}</div>
-                    <div class="panel-image">
-                        <i class="fas fa-image"></i>
-                        <span>תמונה: ${panel.imagePrompt}</span>
+                    <div class="panel-image-container">
+                        ${imageContent}
                     </div>
+                    <div class="panel-text">${panel.text}</div>
+                    
                 </div>
                 <input type="text" class="dialog-input" placeholder="הוסף דיאלוג..." 
-                       value="${panel.dialog}" onchange="updatePanelDialog(${panel.id}, this.value)">
+                        value="${panel.dialog}" onchange="updatePanelDialog(${panel.id}, this.value)">
+                <textarea class="image-prompt-input" placeholder="תיאור תמונה..." 
+                          onchange="updatePanelImagePrompt(${panel.id}, this.value)">${panel.imagePrompt}</textarea>
             </div>
         `;
     });
@@ -526,6 +567,46 @@ function updatePanelDialog(panelId, dialog) {
         showToast('דיאלוג עודכן', 'info');
     }
 }
+
+// **חדש**: פונקציה לעדכון תיאור התמונה בפנל ספציפי
+function updatePanelImagePrompt(panelId, newPrompt) {
+    const panel = comicPanels.find(p => p.id === panelId);
+    if (panel) {
+        panel.imagePrompt = newPrompt;
+        showToast('תיאור תמונה עודכן', 'info');
+    }
+}
+
+// **חדש**: פונקציה ליצירת תמונה עבור פנל ספציפי (נקרא מכפתור)
+async function generateImageForPanel(panelId) {
+    const panel = comicPanels.find(p => p.id === panelId);
+    if (!panel) return;
+
+    if (!window.apiKey) {
+        showToast('אנא הגדר מפתח API תחילה', 'error');
+        showSection('api-setup');
+        return;
+    }
+
+    panel.imageLoading = true;
+    renderComicPanels(); 
+    showToast('יוצר תמונה עבור הפנל...', 'info');
+
+    try {
+        const imageUrl = await generateAIImage(panel.imagePrompt);
+        panel.imageUrl = imageUrl;
+        panel.imageLoading = false;
+        renderComicPanels(); 
+        showToast('תמונה נוצרה בהצלחה!', 'success');
+    } catch (error) {
+        console.error(`Error generating image for panel ${panel.id}:`, error);
+        panel.imageLoading = false;
+        panel.imageUrl = 'error'; 
+        renderComicPanels(); 
+        showToast(`שגיאה ביצירת תמונה: ${error.message}`, 'error');
+    }
+}
+
 
 // Project Management
 function saveProject() {
@@ -606,7 +687,8 @@ async function downloadComic() {
         const panelHeight = 250;
         const margin = 25;
         
-        comicPanels.forEach((panel, index) => {
+        for (let index = 0; index < comicPanels.length; index++) {
+            const panel = comicPanels[index];
             const row = Math.floor(index / panelsPerRow);
             const col = index % panelsPerRow;
             
@@ -618,7 +700,22 @@ async function downloadComic() {
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, panelWidth, panelHeight);
             
-            // Draw panel content
+            // **שינוי כאן:** צייר את התמונה בפנל
+            if (panel.imageUrl && panel.imageUrl !== 'error') {
+                const img = new Image();
+                img.src = panel.imageUrl;
+                await new Promise(resolve => img.onload = resolve); 
+                ctx.drawImage(img, x + 5, y + 5, panelWidth - 10, panelHeight - 70); 
+            } else {
+                // אם אין תמונה או שגיאה, צייר ריבוע אפור עם הודעה
+                ctx.fillStyle = '#eee';
+                ctx.fillRect(x + 5, y + 5, panelWidth - 10, panelHeight - 70);
+                ctx.fillStyle = '#666';
+                ctx.font = '14px Heebo';
+                ctx.textAlign = 'center';
+                ctx.fillText('אין תמונה', x + panelWidth / 2, y + panelHeight / 2 - 30);
+            }
+
             ctx.fillStyle = '#333';
             ctx.font = '16px Heebo';
             ctx.textAlign = 'right';
@@ -626,7 +723,7 @@ async function downloadComic() {
             // Wrap text
             const words = panel.text.split(' ');
             let line = '';
-            let lineY = y + 30;
+            let lineY = y + panelHeight - 60; 
             
             for (let n = 0; n < words.length; n++) {
                 const testLine = line + words[n] + ' ';
@@ -636,7 +733,7 @@ async function downloadComic() {
                 if (testWidth > panelWidth - 20 && n > 0) {
                     ctx.fillText(line, x + panelWidth - 10, lineY);
                     line = words[n] + ' ';
-                    lineY += 25;
+                    lineY += 20; 
                 } else {
                     line = testLine;
                 }
@@ -646,14 +743,16 @@ async function downloadComic() {
             // Draw dialog if exists
             if (panel.dialog) {
                 ctx.fillStyle = 'white';
-                ctx.fillRect(x + 10, y + panelHeight - 60, panelWidth - 20, 40);
-                ctx.strokeRect(x + 10, y + panelHeight - 60, panelWidth - 20, 40);
+                ctx.fillRect(x + 10, y + panelHeight - 35, panelWidth - 20, 25); 
+                ctx.strokeStyle = '#333';
+                ctx.strokeRect(x + 10, y + panelHeight - 35, panelWidth - 20, 25);
                 
                 ctx.fillStyle = '#333';
                 ctx.font = '14px Heebo';
-                ctx.fillText(panel.dialog, x + panelWidth - 20, y + panelHeight - 35);
+                ctx.textAlign = 'right';
+                ctx.fillText(panel.dialog, x + panelWidth - 20, y + panelHeight - 15); 
             }
-        });
+        }
         
         // Convert to blob and download
         canvas.toBlob(function(blob) {
@@ -837,8 +936,8 @@ function showToast(message, type = 'info') {
     toast.className = `toast ${type}`;
     
     const icon = type === 'success' ? 'fa-check-circle' : 
-                 type === 'error' ? 'fa-exclamation-circle' : 
-                 'fa-info-circle';
+                   type === 'error' ? 'fa-exclamation-circle' : 
+                   'fa-info-circle';
     
     toast.innerHTML = `
         <i class="fas ${icon}"></i>
@@ -872,7 +971,7 @@ setInterval(() => {
 if (typeof CryptoJS === 'undefined') {
     window.CryptoJS = {
         AES: {
-            encrypt: (text, key) => btoa(text), // Simple base64 encoding as fallback
+            encrypt: (text, key) => btoa(text), 
             decrypt: (encrypted, key) => ({ toString: () => atob(encrypted) })
         },
         enc: {
@@ -918,8 +1017,8 @@ if (typeof Sortable === 'undefined') {
                     
                     if (options.onEnd) {
                         options.onEnd({
-                            oldIndex: 0, // Simplified
-                            newIndex: 0  // Simplified
+                            oldIndex: 0, 
+                            newIndex: 0  
                         });
                     }
                 }
@@ -928,52 +1027,31 @@ if (typeof Sortable === 'undefined') {
     };
 }
 
-
-
 async function generateAIImage(imageDescription) {
     if (!window.apiKey) {
         showToast('אנא הגדר מפתח API תחילה', 'error');
         showSection('api-setup');
-        return;
+        throw new Error('API key is not set.');
     }
 
     if (!imageDescription || imageDescription.trim() === '') {
         showToast('אנא ספק תיאור לתמונה', 'error');
-        return;
+        throw new Error('Image description is empty.');
     }
 
-    showToast('יוצר תמונה אוטומטית...', 'info');
-
     try {
-        // ה-URL הספציפי למודלי יצירת תמונות של Imagen
-        // זהו ה-URL הספציפי של Vertex AI למודל Imagen.
-        // עבור משתמשי AI Studio, הוא לרוב יהיה נגיש דרך API מסוג REST.
-        // יש לוודא את הנתיב המדויק בתיעוד הרשמי של גוגל עבור המודל.
-        // דוגמה ל-URL עבור Imagen ב-Vertex AI:
-        // `https://<REGION>-aiplatform.googleapis.com/v1/projects/<PROJECT_ID>/locations/<REGION>/publishers/google/models/imagegeneration:predict`
-        // מכיוון שאנחנו משתמשים ב-Generative Language API (כמו במפתח ה-AI Studio),
-        // ננסה להשתמש בנתיב הכללי יותר, אך הוא דורש אימות.
-        // הנתיב הבא הוא הנפוץ עבור Imagen דרך Generative Language API (אבל יש לוודא!)
-        const IMAGEN_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/image-generation:generateImages'; 
-        // ייתכן שתצטרך:
-        // `https://generativelanguage.googleapis.com/v1beta/projects/<YOUR_PROJECT_ID>/locations/us-central1/publishers/google/models/imagegeneration:predict`
-        // אם אתה משתמש ב-Vertex AI במפורש. למשתמשי AI Studio הנתיב הראשון לרוב יעבוד.
+        const IMAGEN_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/image-generation:generateImages';
 
         const response = await fetch(IMAGEN_API_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-goog-api-key': window.apiKey // אותו מפתח API
+                'x-goog-api-key': window.apiKey 
             },
             body: JSON.stringify({
-                // מבנה ה-body עבור Imagen
-                // זהו מבנה נפוץ עבור Imagen, ייתכן שינויים קלים
-                prompt: imageDescription, // התיאור של התמונה
-                // אפשר להוסיף פרמטרים נוספים כמו:
-                // aspect_ratio: "1:1",
-                // number_of_images: 1,
-                // quality: "standard",
-                // negative_prompt: "blurry, low quality"
+                 prompt: {
+                     text: imageDescription
+                 }
             })
         });
 
@@ -984,34 +1062,17 @@ async function generateAIImage(imageDescription) {
         }
 
         const data = await response.json();
-        // התגובה של Imagen בדרך כלל מכילה רשימת תמונות בפורמט Base64
-        // הנתיב המדויק לנתוני התמונה יכול להשתנות, בדוק את התיעוד!
-        const generatedImageBase64 = data.images?.[0]?.data; // דוגמה: יכול להיות `data.artifacts[0].base64` או דומה
+        
+        const generatedImageBase64 = data.images?.[0]?.base64Data; 
 
         if (!generatedImageBase64) {
-            throw new Error('No image data received from the API');
+            console.error('Image data not found in response:', data);
+            throw new Error('No image data received from the API. Check API response structure.');
         }
 
-        // כאן תוכל להשתמש ב-generatedImageBase64 כדי להציג את התמונה
-        // לדוגמה, להוסיף אותה לאלמנט <img> בדף ה-HTML
-        const imgElement = document.createElement('img');
-        imgElement.src = `data:image/jpeg;base64,${generatedImageBase64}`; // או image/png, תלוי בפורמט שהמודל מחזיר
-        imgElement.alt = imageDescription;
-        imgElement.style.maxWidth = '100%'; // כדי שהתמונה תתאים לגודל המסך
-        // מצא איפה תרצה להוסיף את התמונה, לדוגמה:
-        const imageOutputDiv = document.getElementById('image-output-container'); // וודא שיש לך div כזה ב-HTML
-        if (imageOutputDiv) {
-            imageOutputDiv.innerHTML = ''; // נקה תוכן קודם
-            imageOutputDiv.appendChild(imgElement);
-        } else {
-            document.body.appendChild(imgElement); // אם אין קונטיינר ספציפי
-        }
-
-        showToast('תמונה נוצרה בהצלחה!', 'success');
-        return imgElement.src; // להחזיר את נתיב התמונה אם תרצה להשתמש בו בהמשך
+        return `data:image/jpeg;base64,${generatedImageBase64}`; 
     } catch (error) {
-        console.error('Error generating image:', error);
-        showToast(`שגיאה ביצירת תמונה: ${error.message}`, 'error');
-        return null;
+        console.error('Error in generateAIImage:', error);
+        throw error; 
     }
 }
