@@ -230,36 +230,33 @@ async function validateApiKey() {
     const apiKeyInput = document.getElementById('api-key');
     const statusDiv = document.getElementById('api-status');
     const key = apiKeyInput.value.trim();
-    
+
     if (!key) {
         showApiStatus('אנא הכנס מפתח API', 'error');
         return;
     }
-    
+
     showApiStatus('בודק את המפתח...', 'info');
-    
+
     try {
-        // Test API key with a simple request
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${key}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: 'Hello'
-                    }]
-                }]
-            })
-        });
-        
+        const response = await fetch(
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${key}`
+                },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: 'Hello' }] }]
+                })
+            }
+        );
         if (response.ok) {
-            // Encrypt and save API key
             const encryptedKey = CryptoJS.AES.encrypt(key, 'comic-creator-secret').toString();
             localStorage.setItem('gemini_api_key', encryptedKey);
             apiKey = key;
-            
+
             showApiStatus('המפתח תקין ונשמר בהצלחה!', 'success');
             showToast('מפתח API נשמר בהצלחה', 'success');
         } else {
@@ -270,6 +267,7 @@ async function validateApiKey() {
         showToast('שגיאה בבדיקת המפתח', 'error');
     }
 }
+
 
 function showApiStatus(message, type) {
     const statusDiv = document.getElementById('api-status');
