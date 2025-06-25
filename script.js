@@ -255,9 +255,8 @@ async function validateApiKey() {
         );
 
         if (response.ok) {
-            // הנתון הגלובלי apiKey חייב להיות זמין לשאר הפונקציות
-            window.apiKey = key; // או להגדיר אותו כמשתנה גלובלי אחר
-            const encryptedKey = CryptoJS.AES.encrypt(key, 'comic-creator-secret').toString();
+            window.apiKey = key; // הגדרת המפתח כגלובלי
+            const encryptedKey = CryptoJS.AES.encrypt(key, 'comic-creator-secret').toString(CryptoJS.enc.Utf8);
             localStorage.setItem('gemini_api_key', encryptedKey);
             
             showApiStatus('המפתח תקין ונשמר בהצלחה!', 'success');
@@ -325,7 +324,7 @@ async function processStory() {
 }
 
 async function generateAIStory() {
-    if (!window.apiKey) { // לוודא שמשתמשים במשתנה הגלובלי שהוגדר
+    if (!window.apiKey) {
         showToast('אנא הגדר מפתח API תחילה', 'error');
         showSection('api-setup');
         return;
@@ -353,7 +352,7 @@ async function generateAIStory() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-goog-api-key': window.apiKey // <-- שינוי כאן ל-x-goog-api-key
+                'x-goog-api-key': window.apiKey // <-- חשוב להשתמש ב-window.apiKey
             },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }]
@@ -378,7 +377,7 @@ async function generateAIStory() {
         document.getElementById('creation-type').value = 'manual';
         toggleCreationMode();
 
-        await processStory(); // אם processStory מסתמך על טקסט הסיפור
+        await processStory(); // יקרא לפונקציה שתחלק את הסיפור לפנלים
 
         showToast('סיפור נוצר בהצלחה!', 'success');
     } catch (error) {
@@ -386,7 +385,6 @@ async function generateAIStory() {
         showToast(`שגיאה ביצירת הסיפור: ${error.message}`, 'error');
     }
 }
-
 
 function displayStoryOutput(panels) {
     const outputDiv = document.getElementById('story-output');
