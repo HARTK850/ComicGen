@@ -82,87 +82,138 @@ function validateApiKey() {
     localStorage.setItem('geminiApiKey', apiKey); // Save to local storage
 }
 
-// Story Editor functions
+// Story Editor Functions
 function toggleCreationMode() {
     const creationType = document.getElementById('creation-type').value;
-    document.getElementById('manual-input').style.display = creationType === 'manual' ? 'block' : 'none';
-    document.getElementById('ai-input').style.display = creationType === 'ai' ? 'block' : 'none';
-}
-
-function processStory() {
-    const storyText = document.getElementById('story-text').value;
-    const storyOutput = document.getElementById('story-output');
-    if (storyText.trim() === '') {
-        showToast('אנא הכנס סיפור לכתיבה ידנית.', 'error');
-        return;
-    }
-
-    // Simulate panel generation from story text
-    const panels = storyText.split(/(?<=[.?!])\s+/).filter(Boolean); // Split by sentences
-    storyOutput.innerHTML = `<h3>פנלים שנוצרו:</h3>`;
-    if (panels.length > 0) {
-        panels.forEach((panelText, index) => {
-            const p = document.createElement('p');
-            p.textContent = `פנל ${index + 1}: ${panelText}`;
-            storyOutput.appendChild(p);
-        });
-        showToast('הסיפור חולק לפנלים בהצלחה!', 'success');
+    const manualInput = document.getElementById('manual-input');
+    const aiInput = document.getElementById('ai-input');
+    
+    if (creationType === 'manual') {
+        manualInput.style.display = 'block';
+        aiInput.style.display = 'none';
     } else {
-        storyOutput.innerHTML = `<p>לא נוצרו פנלים מהסיפור שהוזן.</p>`;
-        showToast('לא נוצרו פנלים מהסיפור.', 'info');
+        manualInput.style.display = 'none';
+        aiInput.style.display = 'block';
     }
 }
 
-async function generateAIStory() {
-    const storyTheme = document.getElementById('story-theme').value;
-    const storyCharacters = document.getElementById('story-characters').value;
-    const storySetting = document.getElementById('story-setting').value;
-    const storyOutput = document.getElementById('story-output');
-
-    if (!storyTheme && !storyCharacters && !storySetting) {
-        showToast('אנא מלא לפחות שדה אחד ליצירת סיפור AI.', 'error');
+async function processStory() {
+    const storyText = document.getElementById('story-text').value.trim();
+    
+    if (!storyText) {
+        showToast('אנא הכנס טקסט סיפור', 'error');
         return;
     }
-
-    const apiKey = localStorage.getItem('geminiApiKey');
-    if (!apiKey) {
-        showToast('אנא הגדר מפתח API לפני יצירת סיפור AI.', 'error');
+    
+    if (!window.apiKey) {
+        showToast('אנא הגדר מפתח API תחילה', 'error');
         showSection('api-setup');
         return;
     }
 
-    storyOutput.innerHTML = `<p>יוצר סיפור באמצעות AI, אנא המתן...</p>`;
-    showToast('יוצר סיפור AI...', 'info');
+    showToast('מעבד את הסיפור ומייצר תמונות...', 'info'); 
+    
+    // Split story into panels (simple logic - can be enhanced)
+    const sentences = storyText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const panels = [];
+    
+    for (let i = 0; i < sentences.length; i++) {
+        const panel = {
+            id: Date.now() + i,
+            text: sentences[i].trim(),
+            dialog: '',
+            imagePrompt: `${sentences[i].trim()} in ${document.getElementById('art-style').value} style`,
+            imageUrl: null, 
+            imageLoading: true // סימון שהתמונה בטעינה
+        };
+        panels.push(panel);
+    }
+    
+    comicPanels = panels;
+    displayStoryOutput(panels); // הצג את הפנלים באופן מיידי עם מצב טעינה
+    renderComicPanels(); // רנדר את הפנלים בעורך הקומיקס כדי להציג את מצב הטעינה
+    showToast('הסיפור חולק לפנלים. יוצר תמונות...', 'info');
 
-    // Simulate AI story generation
+    // **תיקון/חיזוק**: לולאה לייצור תמונות עבור כל פנל
+    const imageGenerationPromises = comicPanels.map(async (panel) => {
+        try {
+            const imageUrl = await generateAIImage(panel.imagePrompt);
+            panel.imageUrl = imageUrl;
+            panel.imageLoading = false; 
+            renderComicPanels(); // עדכן את התצוגה לאחר שכל תמונה נוצרה
+        } catch (error) {
+            console.error(`Error generating image for panel ${panel.id}:`, error);
+            panel.imageLoading = false;
+            panel.imageUrl = 'error'; 
+            renderComicPanels(); // עדכן גם במקרה של שגיאה
+            showToast(`שגיאה ביצירת תמונה עבור פנל: ${panel.text.substring(0, 30)}...`, 'error');
+        }
+    });
+
+    await Promise.all(imageGenerationPromises); // המתן שכל התמונות ייווצרו
+    showToast('כל התמונות נוצרו (או שגיאה התרחשה בחלקן)!', 'success');
+}
+
+async function generateAIStory() {
+    if (!window.apiKey) {
+        showToast('אנא הגדר מפתח API תחילה', 'error');
+        showSection('api-setup');
+        return;
+    }
+
+    const theme = document.getElementById('story-theme').value.trim();
+    const characters = document.getElementById('story-characters').value.trim();
+    const setting = document.getElementById('story-setting').value.trim();
+
+    if (!theme) {
+        showToast('אנא הכנס נושא לסיפור', 'error');
+        return;
+    }
+
+    showToast('יוצר סיפור אוטומטי...', 'info');
+
     try {
-        // In a real application, you would call the Gemini API here
-        // const response = await fetch('YOUR_GEMINI_API_ENDPOINT', {
-        //     method: 'POST',
-        //     headers: {
-        //         'Content-Type': 'application/json',
-        //         'Authorization': `Bearer ${apiKey}`
-        //     },
-        //     body: JSON.stringify({ theme: storyTheme, characters: storyCharacters, setting: storySetting })
-        // });
-        // const data = await response.json();
-        // const generatedStory = data.story; // Assuming API returns story text
+        const prompt = `צור סיפור קצר בעברית על ${theme}. 
+דמויות: ${characters || 'דמויות מעניינות'}
+רקע: ${setting || 'מקום מעניין'}
+הסיפור צריך להיות מתאים לקומיקס עם 4-6 פנלים.
+כתוב את הסיפור בצורה ברורה עם משפטים קצרים.`;
 
-        // Placeholder for AI generated story
-        const generatedStory = `
-            בעיר עתידנית, גיבור צעיר בשם אלון מצא דרקון קסום בשם פיירו.
-            הם יצאו יחד למסע להצלת הנסיכה לילה, שנחטפה על ידי מכשף רשע.
-            במהלך המסע הם נתקלו במכשולים רבים, אך בעזרת ידידותם ואומץ לבם הצליחו להתגבר על כולם.
-            לבסוף, הם הגיעו לטירה האפלה, הביסו את המכשף והצילו את הנסיכה, שהתגלתה כקוסמת חזקה בעצמה.
-            העיר חגגה את חזרתם, ואלון, פיירו והנסיכה הפכו לגיבורים אגדיים.
-        `;
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': window.apiKey 
+            },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
+        });
 
-        processStoryFromAI(generatedStory); // Process the AI generated story into panels
-        showToast('סיפור AI נוצר בהצלחה!', 'success');
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('API Error Response during story generation:', errorData);
+            throw new Error(`Failed to generate story: ${errorData.error?.message || response.statusText}`);
+        }
+
+        const data = await response.json();
+        const generatedStory = data.candidates[0]?.content?.parts?.[0]?.text;
+
+        if (!generatedStory) {
+            throw new Error('No story received from the API');
+        }
+
+        document.getElementById('story-text').value = generatedStory;
+
+        document.getElementById('creation-type').value = 'manual';
+        toggleCreationMode();
+
+        await processStory(); // יקרא לפונקציה שתחלק את הסיפור לפנלים וגם תיצור תמונות
+
+        showToast('סיפור נוצר בהצלחה!', 'success');
     } catch (error) {
-        console.error('Error generating AI story:', error);
-        storyOutput.innerHTML = `<p style="color: red;">שגיאה ביצירת סיפור AI: ${error.message}. ודא שמפתח ה-API תקין.</p>`;
-        showToast('שגיאה ביצירת סיפור AI.', 'error');
+        console.error('Error generating story:', error);
+        showToast(`שגיאה ביצירת הסיפור: ${error.message}`, 'error');
     }
 }
 
