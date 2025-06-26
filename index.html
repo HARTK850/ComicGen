@@ -3,24 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>יוצר הקומיקס העברי</title>
+    <title>ComicGen - מחולל הקומיקסים</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <!-- Loading Screen -->
     <div id="loading-screen" class="loading-screen">
         <div class="loading-spinner"></div>
-        <p>טוען את יוצר הקומיקס...</p>
+        <p>טוען את ComicGen...</p>
     </div>
 
-    <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-brand">
                 <i class="fas fa-book-open"></i>
-                <span>יוצר הקומיקס העברי</span>
+                <span>ComicGen - מחולל הקומיקסים</span>
             </div>
             <div class="nav-menu">
                 <button class="nav-btn" onclick="showSection('home')">
@@ -39,6 +37,10 @@
                     <i class="fas fa-images"></i>
                     <span>עורך קומיקס</span>
                 </button>
+                <button class="nav-btn" onclick="showSection('projects')">
+                    <i class="fas fa-folder-open"></i>
+                    <span>פרויקטים</span>
+                </button>
                 <button class="nav-btn" onclick="showSection('feedback')">
                     <i class="fas fa-star"></i>
                     <span>משוב</span>
@@ -48,25 +50,14 @@
                     <span>ניהול</span>
                 </button>
             </div>
-            <div class="nav-user">
-                <button class="user-btn" onclick="toggleUserMenu()">
-                    <i class="fas fa-user"></i>
-                </button>
-                <div class="user-menu" id="user-menu">
-                    <button onclick="showLoginModal()">התחברות</button>
-                    <button onclick="logout()">התנתקות</button>
-                </div>
             </div>
-        </div>
     </nav>
 
-    <!-- Main Content -->
     <main class="main-content">
-        <!-- Home Section -->
         <section id="home" class="section active">
             <div class="hero">
                 <div class="hero-content">
-                    <h1 class="hero-title">ברוכים הבאים ליוצר הקומיקס העברי</h1>
+                    <h1 class="hero-title">ברוכים הבאים ל-ComicGen</h1>
                     <p class="hero-subtitle">צרו קומיקסים מדהימים בעברית עם בינה מלאכותית</p>
                     <div class="hero-buttons">
                         <button class="btn btn-primary" onclick="showSection('story-editor')">
@@ -81,9 +72,7 @@
                 </div>
                 <div class="hero-image">
                     <div class="comic-preview">
-                        <div class="comic-panel">
-                            <div class="speech-bubble">שלום עולם!</div>
-                        </div>
+                        <img src="comic.png" alt="Comic Preview" class="full-size-image">
                     </div>
                 </div>
             </div>
@@ -115,7 +104,6 @@
             </div>
         </section>
 
-        <!-- API Setup Section -->
         <section id="api-setup" class="section">
             <div class="container">
                 <h2><i class="fas fa-key"></i> הגדרת מפתח API</h2>
@@ -148,7 +136,6 @@
             </div>
         </section>
 
-        <!-- Story Editor Section -->
         <section id="story-editor" class="section">
             <div class="container">
                 <h2><i class="fas fa-edit"></i> עורך הסיפור</h2>
@@ -173,7 +160,6 @@
                         </div>
                     </div>
 
-                    <!-- Manual Story Input -->
                     <div id="manual-input" class="input-section">
                         <div class="form-group">
                             <label for="story-text">הכנס את הסיפור שלך:</label>
@@ -185,7 +171,6 @@
                         </button>
                     </div>
 
-                    <!-- AI Story Generation -->
                     <div id="ai-input" class="input-section" style="display: none;">
                         <div class="ai-prompts">
                             <div class="form-group">
@@ -212,7 +197,6 @@
             </div>
         </section>
 
-        <!-- Comic Editor Section -->
         <section id="comic-editor" class="section">
             <div class="container">
                 <h2><i class="fas fa-images"></i> עורך הקומיקס</h2>
@@ -222,7 +206,7 @@
                             <i class="fas fa-plus"></i>
                             הוסף פנל
                         </button>
-                        <button onclick="saveProject()" class="btn btn-primary">
+                        <button onclick="showSaveProjectModal()" class="btn btn-primary">
                             <i class="fas fa-save"></i>
                             שמור פרויקט
                         </button>
@@ -233,13 +217,24 @@
                     </div>
                     
                     <div id="comic-panels" class="comic-panels">
-                        <!-- Panels will be dynamically added here -->
-                    </div>
+                        </div>
                 </div>
             </div>
         </section>
 
-        <!-- Feedback Section -->
+        <section id="projects" class="section">
+            <div class="container">
+                <h2><i class="fas fa-folder-open"></i> הפרויקטים שלי</h2>
+                <div class="projects-container">
+                    <div class="projects-toolbar">
+                        <input type="text" id="project-search" placeholder="חפש פרויקט לפי שם..." onkeyup="filterProjects()">
+                    </div>
+                    <div id="projects-list" class="projects-list">
+                        </div>
+                </div>
+            </div>
+        </section>
+
         <section id="feedback" class="section">
             <div class="container">
                 <h2><i class="fas fa-star"></i> משוב ודירוג</h2>
@@ -268,7 +263,6 @@
             </div>
         </section>
 
-        <!-- Admin Section -->
         <section id="admin" class="section">
             <div class="container">
                 <h2><i class="fas fa-chart-bar"></i> פאנל ניהול</h2>
@@ -319,26 +313,35 @@
         </section>
     </main>
 
-    <!-- Login Modal -->
-    <div id="login-modal" class="modal">
+    <div id="save-project-modal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closeLoginModal()">&times;</span>
-            <h2>התחברות</h2>
-            <form id="login-form">
+            <span class="close" onclick="closeSaveProjectModal()">&times;</span>
+            <h2>שמור פרויקט</h2>
+            <form id="save-project-form">
                 <div class="form-group">
-                    <label for="username">שם משתמש:</label>
-                    <input type="text" id="username" required>
+                    <label for="project-name">שם הפרויקט:</label>
+                    <input type="text" id="project-name" required placeholder="הכנס שם לפרויקט">
                 </div>
-                <div class="form-group">
-                    <label for="password">סיסמה:</label>
-                    <input type="password" id="password" required>
-                </div>
-                <button type="submit" class="btn btn-primary">התחבר</button>
+                <button type="submit" class="btn btn-primary">שמור</button>
             </form>
         </div>
     </div>
 
-    <!-- Toast Notifications -->
+    <div id="edit-project-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditProjectModal()">&times;</span>
+            <h2>שנה שם לפרויקט</h2>
+            <form id="edit-project-form">
+                <div class="form-group">
+                    <label for="edit-project-name">שם פרויקט חדש:</label>
+                    <input type="text" id="edit-project-name" required>
+                    <input type="hidden" id="edit-project-id">
+                </div>
+                <button type="submit" class="btn btn-primary">שמור שינויים</button>
+            </form>
+        </div>
+    </div>
+
     <div id="toast-container" class="toast-container"></div>
 
     <script src="script.js"></script>
