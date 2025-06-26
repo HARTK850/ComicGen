@@ -1,3 +1,6 @@
+// Variable to hold the API key globally
+let globalApiKey = null; 
+
 document.addEventListener('DOMContentLoaded', () => {
     // Hide loading screen
     const loadingScreen = document.getElementById('loading-screen');
@@ -6,6 +9,23 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             loadingScreen.style.display = 'none';
         }, 500);
+    }
+
+    // **תיקון: טעינת מפתח ה-API מ-localStorage בעת טעינת הדף**
+    const storedApiKey = localStorage.getItem('geminiApiKey');
+    if (storedApiKey) {
+        globalApiKey = storedApiKey;
+        // אופציונלי: עדכן את שדה הקלט של ה-API key בתצוגה
+        const apiKeyInput = document.getElementById('api-key');
+        if (apiKeyInput) {
+            apiKeyInput.value = storedApiKey;
+            // גם עדכן את סטטוס ה-API אם קיים
+            const apiStatus = document.getElementById('api-status');
+            if (apiStatus) {
+                apiStatus.className = 'api-status success';
+                apiStatus.textContent = 'מפתח API נטען בהצלחה.';
+            }
+        }
     }
 
     // Initialize the active section to 'home'
@@ -71,6 +91,7 @@ function validateApiKey() {
         apiStatus.className = 'api-status error';
         apiStatus.textContent = 'אנא הכנס מפתח API.';
         showToast('מפתח API ריק.', 'error');
+        globalApiKey = null; // Clear the global key if empty
         return;
     }
 
@@ -80,6 +101,7 @@ function validateApiKey() {
     apiStatus.textContent = 'מפתח API תקף! נשמר בהצלחה.';
     showToast('מפתח API נשמר בהצלחה!', 'success');
     localStorage.setItem('geminiApiKey', apiKey); // Save to local storage
+    globalApiKey = apiKey; // **תיקון: שמירת המפתח גם במשתנה הגלובלי**
 }
 
 // Story Editor Functions
@@ -105,7 +127,8 @@ async function processStory() {
         return;
     }
     
-    if (!window.apiKey) {
+    // **תיקון: השתמש ב-globalApiKey במקום window.apiKey**
+    if (!globalApiKey) { 
         showToast('אנא הגדר מפתח API תחילה', 'error');
         showSection('api-setup');
         return;
@@ -137,7 +160,8 @@ async function processStory() {
     // **תיקון/חיזוק**: לולאה לייצור תמונות עבור כל פנל
     const imageGenerationPromises = comicPanels.map(async (panel) => {
         try {
-            const imageUrl = await generateAIImage(panel.imagePrompt);
+            // **תיקון: העבר את ה-API Key ל-generateAIImage**
+            const imageUrl = await generateAIImage(panel.imagePrompt); 
             panel.imageUrl = imageUrl;
             panel.imageLoading = false; 
             renderComicPanels(); // עדכן את התצוגה לאחר שכל תמונה נוצרה
@@ -155,7 +179,8 @@ async function processStory() {
 }
 
 async function generateAIStory() {
-    if (!window.apiKey) {
+    // **תיקון: השתמש ב-globalApiKey במקום window.apiKey**
+    if (!globalApiKey) { 
         showToast('אנא הגדר מפתח API תחילה', 'error');
         showSection('api-setup');
         return;
@@ -183,7 +208,7 @@ async function generateAIStory() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-goog-api-key': window.apiKey 
+                'x-goog-api-key': globalApiKey // **תיקון: שימוש ב-globalApiKey**
             },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }]
@@ -220,6 +245,123 @@ async function generateAIStory() {
 function processStoryFromAI(story) {
     document.getElementById('story-text').value = story; // Populate manual input with AI story
     processStory(); // Process the story into panels
+}
+
+// **פונקציה חסרה: generateAIImage - הוסף אותה אם היא לא קיימת בקובץ שלך**
+async function generateAIImage(prompt) {
+    if (!globalApiKey) {
+        throw new Error('API Key is not set for image generation.');
+    }
+
+    // For demonstration, returning a placeholder.
+    // In a real application, you would make an actual API call to an image generation service.
+    // Example with a simulated delay:
+    return new Promise(resolve => {
+        setTimeout(() => {
+            const placeholderImageUrl = `https://via.placeholder.com/300x150?text=AI+Image`;
+            resolve(placeholderImageUrl);
+        }, 1500); 
+    });
+
+    /*
+    // Example of how you might call a real image generation API (e.g., DALL-E)
+    try {
+        const response = await fetch('YOUR_IMAGE_GENERATION_API_ENDPOINT', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${globalApiKey}` // Use your API key
+            },
+            body: JSON.stringify({ prompt: prompt, size: "512x512" }) // Adjust parameters as needed by your API
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Image API Error:', errorData);
+            throw new Error(`Failed to generate image: ${errorData.error?.message || response.statusText}`);
+        }
+
+        const data = await response.json();
+        // Adjust this line based on what your image generation API returns
+        const imageUrl = data.data[0].url; // Example for DALL-E
+        return imageUrl;
+
+    } catch (error) {
+        console.error('Error in generateAIImage:', error);
+        throw error; // Re-throw to be caught by the caller
+    }
+    */
+}
+
+// **פונקציה חסרה: displayStoryOutput - הוסף אותה אם היא לא קיימת בקובץ שלך**
+function displayStoryOutput(panels) {
+    const storyOutputContainer = document.getElementById('story-output'); // וודא שיש לך אלמנט כזה ב-HTML
+    if (!storyOutputContainer) {
+        console.warn("Element with id 'story-output' not found. Story panels will not be displayed here.");
+        return;
+    }
+    storyOutputContainer.innerHTML = ''; // Clear previous content
+
+    panels.forEach((panel, index) => {
+        const panelDiv = document.createElement('div');
+        panelDiv.classList.add('story-output-panel');
+        panelDiv.innerHTML = `
+            <h4>פנל ${index + 1}</h4>
+            <p>${panel.text}</p>
+            ${panel.imageLoading ? '<p>טוען תמונה... <i class="fas fa-spinner fa-spin"></i></p>' : 
+             (panel.imageUrl === 'error' ? '<p style="color: red;">שגיאה בטעינת תמונה.</p>' : 
+             (panel.imageUrl ? `<img src="${panel.imageUrl}" alt="Panel Image">` : '<p>אין תמונה</p>'))}
+            ${panel.dialog ? `<p>דיאלוג: ${panel.dialog}</p>` : ''}
+        `;
+        storyOutputContainer.appendChild(panelDiv);
+    });
+}
+
+// **פונקציה חסרה: renderComicPanels - הוסף אותה אם היא לא קיימת בקובץ שלך**
+function renderComicPanels() {
+    const comicPanelsContainer = document.getElementById('comic-panels');
+    if (!comicPanelsContainer) {
+        console.warn("Element with id 'comic-panels' not found. Comic editor panels will not be rendered.");
+        return;
+    }
+    comicPanelsContainer.innerHTML = ''; // Clear existing panels
+
+    currentComicPanels.forEach(panelData => {
+        const panelDiv = document.createElement('div');
+        panelDiv.classList.add('comic-panel-item');
+        panelDiv.setAttribute('draggable', 'true');
+        panelDiv.dataset.panelId = panelData.id;
+
+        panelDiv.innerHTML = `
+            <div class="panel-header">
+                <span class="panel-number">פנל </span>
+                <div class="panel-controls">
+                    <button class="panel-btn" onclick="removePanel('${panelData.id}')" title="מחק פנל"><i class="fas fa-trash"></i></button>
+                    <button class="panel-btn" onclick="generatePanelImage('${panelData.id}')" title="צור תמונה לפנל"><i class="fas fa-image"></i></button>
+                </div>
+            </div>
+            <div class="panel-content">
+                <textarea class="panel-text" placeholder="כתוב את תיאור הפנל..." oninput="updatePanelContent('${panelData.id}', 'text', this.value)">${panelData.text}</textarea>
+                <div class="panel-image" onclick="openImageUpload('${panelData.id}')">
+                    ${panelData.imageLoading ? 'טוען תמונה... <i class="fas fa-spinner fa-spin"></i>' :
+                      (panelData.imageUrl === 'error' ? '<p style="color: red;">שגיאה בטעינת תמונה.</p>' : 
+                      (panelData.imageUrl ? `<img src="${panelData.imageUrl}" alt="Panel Image">` : 'לחץ להעלאת תמונה או צור עם AI'))}
+                </div>
+                <div class="panel-dialogs" data-panel-id="${panelData.id}">
+                    ${panelData.dialogs.map((d, idx) => `
+                        <div class="dialog-item">
+                            <input type="text" value="${d}" class="dialog-input" oninput="updatePanelContent('${panelData.id}', 'dialog', this.value, ${idx})">
+                            <button class="panel-btn" onclick="removeDialog('${panelData.id}', ${idx})" title="מחק דיאלוג"><i class="fas fa-times"></i></button>
+                        </div>
+                    `).join('')}
+                    <button class="btn btn-secondary add-dialog-btn" onclick="addDialog('${panelData.id}')">הוסף דיאלוג</button>
+                </div>
+            </div>
+        `;
+        comicPanelsContainer.appendChild(panelDiv);
+        addDragAndDropListeners(panelDiv);
+    });
+    updatePanelNumbers();
 }
 
 
@@ -348,8 +490,8 @@ function generatePanelImage(panelId) {
     const panel = currentComicPanels.find(p => p.id === panelId);
     if (!panel) return;
 
-    const apiKey = localStorage.getItem('geminiApiKey');
-    if (!apiKey) {
+    // **תיקון: השתמש ב-globalApiKey**
+    if (!globalApiKey) { 
         showToast('אנא הגדר מפתח API לפני יצירת תמונה.', 'error');
         showSection('api-setup');
         return;
@@ -375,7 +517,7 @@ function generatePanelImage(panelId) {
     //         method: 'POST',
     //         headers: {
     //             'Content-Type': 'application/json',
-    //             'Authorization': `Bearer ${apiKey}` // If required
+    //             'Authorization': `Bearer ${globalApiKey}` // If required, use globalApiKey
     //         },
     //         body: JSON.stringify({ prompt: prompt, style: artStyle })
     //     });
