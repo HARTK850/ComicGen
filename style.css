@@ -982,3 +982,12 @@ body {
         height: 180px; /* Adjust height for small screens */
     }
 }
+
+
+.panel-generated-image {
+    max-width: 100%; /* ודא שהרוחב לא חורג מהקונטיינר */
+    max-height: 100%; /* ודא שהגובה לא חורג מהקונטיינר */
+    object-fit: contain; /* או cover, בהתאם לאיך שאתה רוצה שהתמונה תמלא את הריבוע */
+    display: block; /* מונע רווחים מיותרים מתחת לתמונה */
+    margin: 0 auto; /* ממקם את התמונה במרכז אם היא קטנה מהקונטיינר */
+}
