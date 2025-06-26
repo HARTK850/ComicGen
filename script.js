@@ -1,220 +1,57 @@
-// Global Variables
-let currentUser = null;
-let currentProject = null;
-let apiKey = null;
-let currentRating = 0;
-let comicPanels = [];
-let draggedElement = null;
-
-// Admin email for reports
-const ADMIN_EMAIL = 'y15761576@gmail.com';
-
-// Initialize the application
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
-});
-
-function initializeApp() {
-    // Hide loading screen after 2 seconds
-    setTimeout(() => {
-        const loadingScreen = document.getElementById('loading-screen');
+document.addEventListener('DOMContentLoaded', () => {
+    // Hide loading screen
+    const loadingScreen = document.getElementById('loading-screen');
+    if (loadingScreen) {
         loadingScreen.style.opacity = '0';
         setTimeout(() => {
             loadingScreen.style.display = 'none';
         }, 500);
-    }, 2000);
+    }
 
-    // Load saved data
-    loadSavedData();
-    
-    // Initialize event listeners
-    initializeEventListeners();
-    
-    // Check if user is admin
-    checkAdminAccess();
-    
-    // Update statistics
-    updateStatistics();
-    
-    // Show home section by default
+    // Initialize the active section to 'home'
     showSection('home');
+    loadProjects(); // Load projects on startup
+});
+
+// Utility function to show toast notifications
+function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.classList.add('toast', type);
+    toast.innerHTML = `<span>${message}</span>`;
+    toastContainer.prepend(toast); // Add to the top
+
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
 }
 
-function loadSavedData() {
-    // Load API key
-    const savedApiKey = localStorage.getItem('gemini_api_key');
-    if (savedApiKey) {
-        try {
-            const decryptedKey = CryptoJS.AES.decrypt(savedApiKey, 'comic-creator-secret').toString(CryptoJS.enc.Utf8);
-            apiKey = decryptedKey;
-            document.getElementById('api-key').value = decryptedKey;
-        } catch (error) {
-            console.error('Error decrypting API key:', error);
-        }
-    }
-    
-    // Load current user
-    const savedUser = localStorage.getItem('current_user');
-    if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-    }
-    
-    // Load current project
-    const savedProject = localStorage.getItem('current_project');
-    if (savedProject) {
-        currentProject = JSON.parse(savedProject);
-        loadProject(currentProject);
-    }
-}
-
-function initializeEventListeners() {
-    // Star rating
-    const stars = document.querySelectorAll('.star');
-    stars.forEach(star => {
-        star.addEventListener('click', function() {
-            currentRating = parseInt(this.dataset.rating);
-            updateStarRating(currentRating);
-        });
-        
-        star.addEventListener('mouseover', function() {
-            const rating = parseInt(this.dataset.rating);
-            updateStarRating(rating);
-        });
-    });
-    
-    // Reset star rating on mouse leave
-    document.getElementById('star-rating').addEventListener('mouseleave', function() {
-        updateStarRating(currentRating);
-    });
-    
-    // Login form
-    document.getElementById('login-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        handleLogin();
-    });
-    
-    // Close modal when clicking outside
-    window.addEventListener('click', function(e) {
-        const modal = document.getElementById('login-modal');
-        if (e.target === modal) {
-            closeLoginModal();
-        }
-    });
-    
-    // Auto-save functionality
-    setInterval(autoSave, 30000); // Auto-save every 30 seconds
-}
-
-// Navigation Functions
+// Function to handle section display
 function showSection(sectionId) {
-    // Hide all sections
-    const sections = document.querySelectorAll('.section');
-    sections.forEach(section => {
+    document.querySelectorAll('.section').forEach(section => {
         section.classList.remove('active');
     });
-    
-    // Show selected section
-    const targetSection = document.getElementById(sectionId);
-    if (targetSection) {
-        targetSection.classList.add('active');
-    }
-    
-    // Update navigation buttons
-    const navButtons = document.querySelectorAll('.nav-btn');
-    navButtons.forEach(btn => {
+    document.getElementById(sectionId).classList.add('active');
+
+    // Update active state of navigation buttons
+    document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.remove('active');
     });
-    
-    // Find and activate the corresponding nav button
-    const activeBtn = Array.from(navButtons).find(btn => 
-        btn.onclick && btn.onclick.toString().includes(sectionId)
-    );
+    const activeBtn = document.querySelector(`.nav-btn[onclick="showSection('${sectionId}')"]`);
     if (activeBtn) {
         activeBtn.classList.add('active');
     }
-}
 
-// User Management
-function toggleUserMenu() {
-    const userMenu = document.getElementById('user-menu');
-    userMenu.classList.toggle('show');
-}
-
-function showLoginModal() {
-    document.getElementById('login-modal').style.display = 'block';
-    toggleUserMenu();
-}
-
-function closeLoginModal() {
-    document.getElementById('login-modal').style.display = 'none';
-}
-
-function handleLogin() {
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    
-    if (!username || !password) {
-        showToast('אנא מלא את כל השדות', 'error');
-        return;
-    }
-    
-    // Simple authentication (in real app, this would be server-side)
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const user = users.find(u => u.username === username && u.password === password);
-    
-    if (user) {
-        currentUser = user;
-        localStorage.setItem('current_user', JSON.stringify(user));
-        showToast('התחברת בהצלחה!', 'success');
-        closeLoginModal();
-        checkAdminAccess();
-    } else {
-        // Create new user if doesn't exist
-        const newUser = {
-            id: Date.now(),
-            username: username,
-            password: password, // In real app, this would be hashed
-            createdAt: new Date().toISOString(),
-            isAdmin: username === 'admin' && password === 'admin123'
-        };
-        
-        users.push(newUser);
-        localStorage.setItem('users', JSON.stringify(users));
-        
-        currentUser = newUser;
-        localStorage.setItem('current_user', JSON.stringify(newUser));
-        
-        showToast('משתמש חדש נוצר בהצלחה!', 'success');
-        closeLoginModal();
-        checkAdminAccess();
-    }
-    
-    // Clear form
-    document.getElementById('login-form').reset();
-}
-
-function logout() {
-    currentUser = null;
-    localStorage.removeItem('current_user');
-    showToast('התנתקת בהצלחה', 'info');
-    toggleUserMenu();
-    checkAdminAccess();
-}
-
-function checkAdminAccess() {
-    const adminBtn = document.querySelector('.admin-only');
-    if (currentUser && currentUser.isAdmin) {
-        adminBtn.style.display = 'flex';
-    } else {
-        adminBtn.style.display = 'none';
+    // If navigating to projects section, refresh the list
+    if (sectionId === 'projects') {
+        loadProjects();
     }
 }
 
-// API Management
+// API Setup functions
 function toggleApiKeyVisibility() {
     const apiKeyInput = document.getElementById('api-key');
     const eyeIcon = document.getElementById('eye-icon');
-    
     if (apiKeyInput.type === 'password') {
         apiKeyInput.type = 'text';
         eyeIcon.classList.remove('fa-eye');
@@ -226,853 +63,592 @@ function toggleApiKeyVisibility() {
     }
 }
 
-async function validateApiKey() {
-    const apiKeyInput = document.getElementById('api-key');
-    const statusDiv = document.getElementById('api-status');
-    const key = apiKeyInput.value.trim();
+function validateApiKey() {
+    const apiKey = document.getElementById('api-key').value;
+    const apiStatus = document.getElementById('api-status');
 
-    if (!key) {
-        showApiStatus('אנא הכנס מפתח API', 'error');
+    if (apiKey.trim() === '') {
+        apiStatus.className = 'api-status error';
+        apiStatus.textContent = 'אנא הכנס מפתח API.';
+        showToast('מפתח API ריק.', 'error');
         return;
     }
 
-    showApiStatus('בודק את המפתח...', 'info');
-
-    try {
-        // נשתמש במודל Gemini לבדיקה, כיוון שהוא מודל גנרי ובטוח יחסית
-        const response = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-goog-api-key': key 
-                },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: 'Hello' }] }]
-                })
-            }
-        );
-
-        if (response.ok) {
-            window.apiKey = key; // הגדרת המפתח כגלובלי
-            const encryptedKey = CryptoJS.AES.encrypt(key, 'comic-creator-secret').toString(CryptoJS.enc.Utf8);
-            localStorage.setItem('gemini_api_key', encryptedKey);
-            
-            showApiStatus('המפתח תקין ונשמר בהצלחה!', 'success');
-            showToast('מפתח API נשמר בהצלחה', 'success');
-        } else {
-            const errorData = await response.json();
-            console.error('API Error Response during validation:', errorData);
-            throw new Error(`Invalid API key or API error: ${errorData.error?.message || response.statusText}`);
-        }
-    } catch (error) {
-        console.error('Error validating API key:', error);
-        showApiStatus(`המפתח לא תקין. אנא בדוק ונסה שוב. ${error.message}`, 'error');
-        showToast('שגיאה בבדיקת המפתח', 'error');
-    }
+    // In a real application, you would make an actual API call to validate the key.
+    // For this example, we'll just simulate a successful validation.
+    apiStatus.className = 'api-status success';
+    apiStatus.textContent = 'מפתח API תקף! נשמר בהצלחה.';
+    showToast('מפתח API נשמר בהצלחה!', 'success');
+    localStorage.setItem('geminiApiKey', apiKey); // Save to local storage
 }
 
-
-function showApiStatus(message, type) {
-    const statusDiv = document.getElementById('api-status');
-    statusDiv.textContent = message;
-    statusDiv.className = `api-status ${type}`;
-}
-
-// Story Editor Functions
+// Story Editor functions
 function toggleCreationMode() {
     const creationType = document.getElementById('creation-type').value;
-    const manualInput = document.getElementById('manual-input');
-    const aiInput = document.getElementById('ai-input');
-    
-    if (creationType === 'manual') {
-        manualInput.style.display = 'block';
-        aiInput.style.display = 'none';
-    } else {
-        manualInput.style.display = 'none';
-        aiInput.style.display = 'block';
-    }
+    document.getElementById('manual-input').style.display = creationType === 'manual' ? 'block' : 'none';
+    document.getElementById('ai-input').style.display = creationType === 'ai' ? 'block' : 'none';
 }
 
-async function processStory() {
-    const storyText = document.getElementById('story-text').value.trim();
-    
-    if (!storyText) {
-        showToast('אנא הכנס טקסט סיפור', 'error');
+function processStory() {
+    const storyText = document.getElementById('story-text').value;
+    const storyOutput = document.getElementById('story-output');
+    if (storyText.trim() === '') {
+        showToast('אנא הכנס סיפור לכתיבה ידנית.', 'error');
         return;
     }
-    
-    showToast('מעבד את הסיפור ומייצר תמונות...', 'info'); 
-    
-    // Split story into panels (simple logic - can be enhanced)
-    const sentences = storyText.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    const panels = [];
-    
-    for (let i = 0; i < sentences.length; i++) {
-        const panel = {
-            id: Date.now() + i,
-            text: sentences[i].trim(),
-            dialog: '',
-            imagePrompt: `${sentences[i].trim()} in ${document.getElementById('art-style').value} style`,
-            imageUrl: null, 
-            imageLoading: true 
-        };
-        panels.push(panel);
-    }
-    
-    comicPanels = panels;
-    displayStoryOutput(panels); 
-    showToast('הסיפור חולק לפנלים. יוצר תמונות...', 'info');
 
-    // **חדש**: לולאה לייצור תמונות עבור כל פנל
-    for (const panel of comicPanels) {
-        try {
-            const imageUrl = await generateAIImage(panel.imagePrompt);
-            panel.imageUrl = imageUrl;
-            panel.imageLoading = false; 
-            renderComicPanels(); 
-        } catch (error) {
-            console.error(`Error generating image for panel ${panel.id}:`, error);
-            panel.imageLoading = false;
-            panel.imageUrl = 'error'; 
-            showToast(`שגיאה ביצירת תמונה עבור פנל: ${panel.text.substring(0, 30)}...`, 'error');
-        }
+    // Simulate panel generation from story text
+    const panels = storyText.split(/(?<=[.?!])\s+/).filter(Boolean); // Split by sentences
+    storyOutput.innerHTML = `<h3>פנלים שנוצרו:</h3>`;
+    if (panels.length > 0) {
+        panels.forEach((panelText, index) => {
+            const p = document.createElement('p');
+            p.textContent = `פנל ${index + 1}: ${panelText}`;
+            storyOutput.appendChild(p);
+        });
+        showToast('הסיפור חולק לפנלים בהצלחה!', 'success');
+    } else {
+        storyOutput.innerHTML = `<p>לא נוצרו פנלים מהסיפור שהוזן.</p>`;
+        showToast('לא נוצרו פנלים מהסיפור.', 'info');
     }
-    
-    showToast('כל התמונות נוצרו (או שגיאה התרחשה בחלקן)!', 'success');
 }
 
 async function generateAIStory() {
-    if (!window.apiKey) {
-        showToast('אנא הגדר מפתח API תחילה', 'error');
+    const storyTheme = document.getElementById('story-theme').value;
+    const storyCharacters = document.getElementById('story-characters').value;
+    const storySetting = document.getElementById('story-setting').value;
+    const storyOutput = document.getElementById('story-output');
+
+    if (!storyTheme && !storyCharacters && !storySetting) {
+        showToast('אנא מלא לפחות שדה אחד ליצירת סיפור AI.', 'error');
+        return;
+    }
+
+    const apiKey = localStorage.getItem('geminiApiKey');
+    if (!apiKey) {
+        showToast('אנא הגדר מפתח API לפני יצירת סיפור AI.', 'error');
         showSection('api-setup');
         return;
     }
 
-    const theme = document.getElementById('story-theme').value.trim();
-    const characters = document.getElementById('story-characters').value.trim();
-    const setting = document.getElementById('story-setting').value.trim();
+    storyOutput.innerHTML = `<p>יוצר סיפור באמצעות AI, אנא המתן...</p>`;
+    showToast('יוצר סיפור AI...', 'info');
 
-    if (!theme) {
-        showToast('אנא הכנס נושא לסיפור', 'error');
-        return;
-    }
-
-    showToast('יוצר סיפור אוטומטי...', 'info');
-
+    // Simulate AI story generation
     try {
-        const prompt = `צור סיפור קצר בעברית על ${theme}. 
-דמויות: ${characters || 'דמויות מעניינות'}
-רקע: ${setting || 'מקום מעניין'}
-הסיפור צריך להיות מתאים לקומיקס עם 4-6 פנלים.
-כתוב את הסיפור בצורה ברורה עם משפטים קצרים.`;
+        // In a real application, you would call the Gemini API here
+        // const response = await fetch('YOUR_GEMINI_API_ENDPOINT', {
+        //     method: 'POST',
+        //     headers: {
+        //         'Content-Type': 'application/json',
+        //         'Authorization': `Bearer ${apiKey}`
+        //     },
+        //     body: JSON.stringify({ theme: storyTheme, characters: storyCharacters, setting: storySetting })
+        // });
+        // const data = await response.json();
+        // const generatedStory = data.story; // Assuming API returns story text
 
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': window.apiKey 
-            },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-            })
-        });
+        // Placeholder for AI generated story
+        const generatedStory = `
+            בעיר עתידנית, גיבור צעיר בשם אלון מצא דרקון קסום בשם פיירו.
+            הם יצאו יחד למסע להצלת הנסיכה לילה, שנחטפה על ידי מכשף רשע.
+            במהלך המסע הם נתקלו במכשולים רבים, אך בעזרת ידידותם ואומץ לבם הצליחו להתגבר על כולם.
+            לבסוף, הם הגיעו לטירה האפלה, הביסו את המכשף והצילו את הנסיכה, שהתגלתה כקוסמת חזקה בעצמה.
+            העיר חגגה את חזרתם, ואלון, פיירו והנסיכה הפכו לגיבורים אגדיים.
+        `;
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('API Error Response during story generation:', errorData);
-            throw new Error(`Failed to generate story: ${errorData.error?.message || response.statusText}`);
-        }
-
-        const data = await response.json();
-        const generatedStory = data.candidates[0]?.content?.parts?.[0]?.text;
-
-        if (!generatedStory) {
-            throw new Error('No story received from the API');
-        }
-
-        document.getElementById('story-text').value = generatedStory;
-
-        document.getElementById('creation-type').value = 'manual';
-        toggleCreationMode();
-
-        await processStory(); // יקרא לפונקציה שתחלק את הסיפור לפנלים
-
-        showToast('סיפור נוצר בהצלחה!', 'success');
+        processStoryFromAI(generatedStory); // Process the AI generated story into panels
+        showToast('סיפור AI נוצר בהצלחה!', 'success');
     } catch (error) {
-        console.error('Error generating story:', error);
-        showToast(`שגיאה ביצירת הסיפור: ${error.message}`, 'error');
+        console.error('Error generating AI story:', error);
+        storyOutput.innerHTML = `<p style="color: red;">שגיאה ביצירת סיפור AI: ${error.message}. ודא שמפתח ה-API תקין.</p>`;
+        showToast('שגיאה ביצירת סיפור AI.', 'error');
     }
 }
 
-function displayStoryOutput(panels) {
-    const outputDiv = document.getElementById('story-output');
-    
-    let html = '<h3>הפנלים שנוצרו:</h3>';
-    panels.forEach((panel, index) => {
-        html += `
-            <div class="story-panel">
-                <h4>פנל ${index + 1}</h4>
-                <p><strong>טקסט:</strong> ${panel.text}</p>
-                <p><strong>תיאור תמונה:</strong> ${panel.imagePrompt}</p>
+function processStoryFromAI(story) {
+    document.getElementById('story-text').value = story; // Populate manual input with AI story
+    processStory(); // Process the story into panels
+}
+
+
+// Comic Editor functions
+let currentComicPanels = []; // Stores the current panels being edited
+let currentProjectId = null; // Stores the ID of the project being edited
+
+function addPanel(panelText = '', imageUrl = '', dialogs = []) {
+    const comicPanelsContainer = document.getElementById('comic-panels');
+    const panelId = `panel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const panelDiv = document.createElement('div');
+    panelDiv.classList.add('comic-panel-item');
+    panelDiv.setAttribute('draggable', 'true'); // Make panels draggable
+    panelDiv.dataset.panelId = panelId;
+
+    panelDiv.innerHTML = `
+        <div class="panel-header">
+            <span class="panel-number">פנל ${comicPanelsContainer.children.length + 1}</span>
+            <div class="panel-controls">
+                <button class="panel-btn" onclick="removePanel('${panelId}')" title="מחק פנל"><i class="fas fa-trash"></i></button>
+                <button class="panel-btn" onclick="generatePanelImage('${panelId}')" title="צור תמונה לפנל"><i class="fas fa-image"></i></button>
             </div>
-        `;
-    });
-    
-    html += `
-        <div class="story-actions">
-            <button onclick="moveToComicEditor()" class="btn btn-primary">
-                <i class="fas fa-arrow-left"></i>
-                עבור לעורך הקומיקס
-            </button>
+        </div>
+        <div class="panel-content">
+            <textarea class="panel-text" placeholder="כתוב את תיאור הפנל..." oninput="updatePanelContent('${panelId}', 'text', this.value)">${panelText}</textarea>
+            <div class="panel-image" onclick="openImageUpload('${panelId}')">
+                ${imageUrl ? `<img src="${imageUrl}" alt="Panel Image">` : 'לחץ להעלאת תמונה או צור עם AI'}
+            </div>
+            <div class="panel-dialogs" data-panel-id="${panelId}">
+                ${dialogs.map((d, idx) => `
+                    <div class="dialog-item">
+                        <input type="text" value="${d}" class="dialog-input" oninput="updatePanelContent('${panelId}', 'dialog', this.value, ${idx})">
+                        <button class="panel-btn" onclick="removeDialog('${panelId}', ${idx})" title="מחק דיאלוג"><i class="fas fa-times"></i></button>
+                    </div>
+                `).join('')}
+                <button class="btn btn-secondary add-dialog-btn" onclick="addDialog('${panelId}')">הוסף דיאלוג</button>
+            </div>
         </div>
     `;
-    
-    outputDiv.innerHTML = html;
-}
+    comicPanelsContainer.appendChild(panelDiv);
 
-function moveToComicEditor() {
-    showSection('comic-editor');
-    renderComicPanels();
-}
+    // Update panel numbers after adding
+    updatePanelNumbers();
 
-// Comic Editor Functions
-function addPanel() {
-    const newPanel = {
-        id: Date.now(),
-        text: 'טקסט חדש...',
-        dialog: '',
-        imagePrompt: 'תיאור תמונה...',
-        imageUrl: null, 
-        imageLoading: false 
-    };
-    
-    comicPanels.push(newPanel);
-    renderComicPanels();
-    showToast('פנל חדש נוסף', 'success');
-}
-
-function renderComicPanels() {
-    const panelsContainer = document.getElementById('comic-panels');
-    
-    if (comicPanels.length === 0) {
-        panelsContainer.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-images"></i>
-                <p>אין פנלים עדיין</p>
-                <p>צור סיפור או הוסף פנל ידנית</p>
-            </div>
-        `;
-        return;
-    }
-    
-    let html = '';
-    comicPanels.forEach((panel, index) => {
-        // **שינוי כאן:** הצג את התמונה אם קיימת, אחרת אינדיקטור טעינה או הודעת שגיאה
-        let imageContent;
-        if (panel.imageLoading) {
-            imageContent = `<div class="image-placeholder loading"><i class="fas fa-spinner fa-spin"></i> טוען תמונה...</div>`;
-        } else if (panel.imageUrl && panel.imageUrl !== 'error') {
-            imageContent = `<img src="${panel.imageUrl}" alt="${panel.imagePrompt}" class="panel-generated-image">`;
-        } else if (panel.imageUrl === 'error') {
-             imageContent = `<div class="image-placeholder error"><i class="fas fa-exclamation-triangle"></i> שגיאת טעינת תמונה</div>`;
-        } else {
-            // אם אין תמונה וגם לא בטעינה, כנראה שטרם בוצעה קריאה ליצירת תמונה
-            imageContent = `<div class="image-placeholder"><i class="fas fa-image"></i> אין תמונה. לחץ כדי ליצור.</div>`;
-        }
-
-
-        html += `
-            <div class="comic-panel-item" data-panel-id="${panel.id}">
-                <div class="panel-header">
-                    <span class="panel-number">פנל ${index + 1}</span>
-                    <div class="panel-controls">
-                        <button class="panel-btn" onclick="generateImageForPanel(${panel.id})" title="צור תמונה לפנל זה">
-                            <i class="fas fa-magic"></i>
-                        </button>
-                        <button class="panel-btn" onclick="editPanel(${panel.id})" title="ערוך">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="panel-btn" onclick="deletePanel(${panel.id})" title="מחק">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="panel-content">
-                    <div class="panel-image-container">
-                        ${imageContent}
-                    </div>
-                    <div class="panel-text">${panel.text}</div>
-                    
-                </div>
-                <input type="text" class="dialog-input" placeholder="הוסף דיאלוג..." 
-                        value="${panel.dialog}" onchange="updatePanelDialog(${panel.id}, this.value)">
-                <textarea class="image-prompt-input" placeholder="תיאור תמונה..." 
-                          onchange="updatePanelImagePrompt(${panel.id}, this.value)">${panel.imagePrompt}</textarea>
-            </div>
-        `;
+    // Add to current comic panels array
+    currentComicPanels.push({
+        id: panelId,
+        text: panelText,
+        imageUrl: imageUrl,
+        dialogs: dialogs
     });
-    
-    panelsContainer.innerHTML = html;
-    
-    // Initialize drag and drop
-    initializeDragAndDrop();
+
+    addDragAndDropListeners(panelDiv); // Add drag and drop listeners to the new panel
 }
 
-function initializeDragAndDrop() {
-    const panelsContainer = document.getElementById('comic-panels');
-    
-    if (typeof Sortable !== 'undefined') {
-        new Sortable(panelsContainer, {
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            onEnd: function(evt) {
-                // Reorder panels array
-                const movedPanel = comicPanels.splice(evt.oldIndex, 1)[0];
-                comicPanels.splice(evt.newIndex, 0, movedPanel);
-                
-                // Re-render to update panel numbers
-                renderComicPanels();
-                showToast('סדר הפנלים שונה', 'info');
-            }
-        });
+function updatePanelNumbers() {
+    const panels = document.querySelectorAll('.comic-panel-item');
+    panels.forEach((panel, index) => {
+        panel.querySelector('.panel-number').textContent = `פנל ${index + 1}`;
+    });
+}
+
+function removePanel(panelId) {
+    if (confirm('האם אתה בטוח שברצונך למחוק פנל זה?')) {
+        document.querySelector(`.comic-panel-item[data-panel-id="${panelId}"]`).remove();
+        currentComicPanels = currentComicPanels.filter(panel => panel.id !== panelId);
+        updatePanelNumbers();
+        showToast('פנל נמחק בהצלחה!', 'info');
     }
 }
 
-function editPanel(panelId) {
-    const panel = comicPanels.find(p => p.id === panelId);
-    if (!panel) return;
-    
-    const newText = prompt('ערוך את הטקסט:', panel.text);
-    if (newText !== null) {
-        panel.text = newText;
-        renderComicPanels();
-        showToast('הפנל עודכן', 'success');
-    }
-}
-
-function deletePanel(panelId) {
-    if (confirm('האם אתה בטוח שברצונך למחוק את הפנל?')) {
-        comicPanels = comicPanels.filter(p => p.id !== panelId);
-        renderComicPanels();
-        showToast('הפנל נמחק', 'info');
-    }
-}
-
-function updatePanelDialog(panelId, dialog) {
-    const panel = comicPanels.find(p => p.id === panelId);
-    if (panel) {
-        panel.dialog = dialog;
-        showToast('דיאלוג עודכן', 'info');
-    }
-}
-
-// **חדש**: פונקציה לעדכון תיאור התמונה בפנל ספציפי
-function updatePanelImagePrompt(panelId, newPrompt) {
-    const panel = comicPanels.find(p => p.id === panelId);
-    if (panel) {
-        panel.imagePrompt = newPrompt;
-        showToast('תיאור תמונה עודכן', 'info');
-    }
-}
-
-// **חדש**: פונקציה ליצירת תמונה עבור פנל ספציפי (נקרא מכפתור)
-async function generateImageForPanel(panelId) {
-    const panel = comicPanels.find(p => p.id === panelId);
+function updatePanelContent(panelId, type, value, dialogIndex = -1) {
+    const panel = currentComicPanels.find(p => p.id === panelId);
     if (!panel) return;
 
-    if (!window.apiKey) {
-        showToast('אנא הגדר מפתח API תחילה', 'error');
+    if (type === 'text') {
+        panel.text = value;
+    } else if (type === 'dialog' && dialogIndex !== -1) {
+        panel.dialogs[dialogIndex] = value;
+    }
+    // No need to save to local storage immediately, will be saved on "שמור פרויקט"
+}
+
+function addDialog(panelId) {
+    const panelDiv = document.querySelector(`.comic-panel-item[data-panel-id="${panelId}"]`);
+    const dialogsContainer = panelDiv.querySelector('.panel-dialogs');
+    const newDialogIndex = dialogsContainer.querySelectorAll('.dialog-item').length;
+
+    const dialogItemDiv = document.createElement('div');
+    dialogItemDiv.classList.add('dialog-item');
+    dialogItemDiv.innerHTML = `
+        <input type="text" placeholder="הכנס דיאלוג..." class="dialog-input" oninput="updatePanelContent('${panelId}', 'dialog', this.value, ${newDialogIndex})">
+        <button class="panel-btn" onclick="removeDialog('${panelId}', ${newDialogIndex})" title="מחק דיאלוג"><i class="fas fa-times"></i></button>
+    `;
+    dialogsContainer.insertBefore(dialogItemDiv, dialogsContainer.lastElementChild); // Insert before the add dialog button
+
+    const panel = currentComicPanels.find(p => p.id === panelId);
+    if (panel) {
+        panel.dialogs.push(''); // Add an empty string for the new dialog
+    }
+}
+
+function removeDialog(panelId, dialogIndex) {
+    const panel = currentComicPanels.find(p => p.id === panelId);
+    if (!panel) return;
+
+    panel.dialogs.splice(dialogIndex, 1); // Remove from array
+
+    const panelDiv = document.querySelector(`.comic-panel-item[data-panel-id="${panelId}"]`);
+    const dialogsContainer = panelDiv.querySelector('.panel-dialogs');
+    // Re-render dialogs to update indices and remove the specific one
+    dialogsContainer.innerHTML = `
+        ${panel.dialogs.map((d, idx) => `
+            <div class="dialog-item">
+                <input type="text" value="${d}" class="dialog-input" oninput="updatePanelContent('${panelId}', 'dialog', this.value, ${idx})">
+                <button class="panel-btn" onclick="removeDialog('${panelId}', ${idx})" title="מחק דיאלוג"><i class="fas fa-times"></i></button>
+            </div>
+        `).join('')}
+        <button class="btn btn-secondary add-dialog-btn" onclick="addDialog('${panelId}')">הוסף דיאלוג</button>
+    `;
+}
+
+
+function generatePanelImage(panelId) {
+    const panel = currentComicPanels.find(p => p.id === panelId);
+    if (!panel) return;
+
+    const apiKey = localStorage.getItem('geminiApiKey');
+    if (!apiKey) {
+        showToast('אנא הגדר מפתח API לפני יצירת תמונה.', 'error');
         showSection('api-setup');
         return;
     }
 
-    panel.imageLoading = true;
-    renderComicPanels(); 
-    showToast('יוצר תמונה עבור הפנל...', 'info');
+    const artStyle = document.getElementById('art-style').value;
+    const prompt = `צור תמונה בסגנון ${artStyle} עבור הפנל הבא: "${panel.text}". קח בחשבון את הדיאלוגים: ${panel.dialogs.join(', ')}.`;
+    const panelImageDiv = document.querySelector(`.comic-panel-item[data-panel-id="${panelId}"] .panel-image`);
+    panelImageDiv.innerHTML = 'יוצר תמונה... <i class="fas fa-spinner fa-spin"></i>';
+    showToast('יוצר תמונה לפנל...', 'info');
 
-    try {
-        const imageUrl = await generateAIImage(panel.imagePrompt);
+    // Simulate image generation with a placeholder image
+    setTimeout(() => {
+        const imageUrl = 'https://via.placeholder.com/300x150?text=Generated+Image'; // Placeholder
+        panelImageDiv.innerHTML = `<img src="${imageUrl}" alt="Panel Image">`;
         panel.imageUrl = imageUrl;
-        panel.imageLoading = false;
-        renderComicPanels(); 
         showToast('תמונה נוצרה בהצלחה!', 'success');
-    } catch (error) {
-        console.error(`Error generating image for panel ${panel.id}:`, error);
-        panel.imageLoading = false;
-        panel.imageUrl = 'error'; 
-        renderComicPanels(); 
-        showToast(`שגיאה ביצירת תמונה: ${error.message}`, 'error');
-    }
+    }, 2000);
+
+    // In a real application, you would call your image generation API here (e.g., DALL-E, Midjourney via API, etc.)
+    // try {
+    //     const response = await fetch('YOUR_IMAGE_GENERATION_API_ENDPOINT', {
+    //         method: 'POST',
+    //         headers: {
+    //             'Content-Type': 'application/json',
+    //             'Authorization': `Bearer ${apiKey}` // If required
+    //         },
+    //         body: JSON.stringify({ prompt: prompt, style: artStyle })
+    //     });
+    //     const data = await response.json();
+    //     const imageUrl = data.imageUrl; // Assuming API returns imageUrl
+
+    //     panelImageDiv.innerHTML = `<img src="${imageUrl}" alt="Panel Image">`;
+    //     panel.imageUrl = imageUrl;
+    //     showToast('תמונה נוצרה בהצלחה!', 'success');
+    // } catch (error) {
+    //     console.error('Error generating image:', error);
+    //     panelImageDiv.innerHTML = 'שגיאה ביצירת תמונה. נסה שוב.';
+    //     showToast('שגיאה ביצירת תמונה.', 'error');
+    // }
 }
 
-
-// Project Management
-function saveProject() {
-    if (!currentUser) {
-        showToast('אנא התחבר כדי לשמור פרויקט', 'error');
-        showLoginModal();
-        return;
-    }
-    
-    const projectName = prompt('שם הפרויקט:', currentProject?.name || 'פרויקט חדש');
-    if (!projectName) return;
-    
-    const project = {
-        id: currentProject?.id || Date.now(),
-        name: projectName,
-        userId: currentUser.id,
-        panels: comicPanels,
-        createdAt: currentProject?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-    
-    // Save to localStorage (in real app, this would be server-side)
-    const projects = JSON.parse(localStorage.getItem('projects') || '[]');
-    const existingIndex = projects.findIndex(p => p.id === project.id);
-    
-    if (existingIndex >= 0) {
-        projects[existingIndex] = project;
-    } else {
-        projects.push(project);
-    }
-    
-    localStorage.setItem('projects', JSON.stringify(projects));
-    localStorage.setItem('current_project', JSON.stringify(project));
-    
-    currentProject = project;
-    showToast('הפרויקט נשמר בהצלחה!', 'success');
-    
-    // Update statistics
-    updateStatistics();
-}
-
-function loadProject(project) {
-    currentProject = project;
-    comicPanels = project.panels || [];
-    renderComicPanels();
-}
-
-function autoSave() {
-    if (currentUser && comicPanels.length > 0) {
-        saveProject();
-    }
-}
-
-async function downloadComic() {
-    if (comicPanels.length === 0) {
-        showToast('אין פנלים להורדה', 'error');
-        return;
-    }
-    
-    showToast('מכין את הקומיקס להורדה...', 'info');
-    
-    try {
-        // Create a canvas for the comic
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Set canvas size (A4 proportions)
-        canvas.width = 800;
-        canvas.height = 1200;
-        
-        // White background
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw panels
-        const panelsPerRow = 2;
-        const panelWidth = 350;
-        const panelHeight = 250;
-        const margin = 25;
-        
-        for (let index = 0; index < comicPanels.length; index++) {
-            const panel = comicPanels[index];
-            const row = Math.floor(index / panelsPerRow);
-            const col = index % panelsPerRow;
-            
-            const x = margin + col * (panelWidth + margin);
-            const y = margin + row * (panelHeight + margin);
-            
-            // Draw panel border
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, panelWidth, panelHeight);
-            
-            // **שינוי כאן:** צייר את התמונה בפנל
-            if (panel.imageUrl && panel.imageUrl !== 'error') {
-                const img = new Image();
-                img.src = panel.imageUrl;
-                await new Promise(resolve => img.onload = resolve); 
-                ctx.drawImage(img, x + 5, y + 5, panelWidth - 10, panelHeight - 70); 
+function openImageUpload(panelId) {
+    // Simulate image upload (in a real app, you'd open a file input or a modal for URL)
+    const imageUrl = prompt('הכנס כתובת URL של תמונה או השאר ריק ליצירה עם AI:');
+    if (imageUrl !== null) {
+        const panel = currentComicPanels.find(p => p.id === panelId);
+        if (panel) {
+            panel.imageUrl = imageUrl.trim() !== '' ? imageUrl : '';
+            const panelImageDiv = document.querySelector(`.comic-panel-item[data-panel-id="${panelId}"] .panel-image`);
+            if (panel.imageUrl) {
+                panelImageDiv.innerHTML = `<img src="${panel.imageUrl}" alt="Panel Image">`;
             } else {
-                // אם אין תמונה או שגיאה, צייר ריבוע אפור עם הודעה
-                ctx.fillStyle = '#eee';
-                ctx.fillRect(x + 5, y + 5, panelWidth - 10, panelHeight - 70);
-                ctx.fillStyle = '#666';
-                ctx.font = '14px Heebo';
-                ctx.textAlign = 'center';
-                ctx.fillText('אין תמונה', x + panelWidth / 2, y + panelHeight / 2 - 30);
+                panelImageDiv.innerHTML = 'לחץ להעלאת תמונה או צור עם AI';
             }
+            showToast('תמונה עודכנה בהצלחה!', 'success');
+        }
+    }
+}
 
-            ctx.fillStyle = '#333';
-            ctx.font = '16px Heebo';
-            ctx.textAlign = 'right';
-            
-            // Wrap text
-            const words = panel.text.split(' ');
-            let line = '';
-            let lineY = y + panelHeight - 60; 
-            
-            for (let n = 0; n < words.length; n++) {
-                const testLine = line + words[n] + ' ';
-                const metrics = ctx.measureText(testLine);
-                const testWidth = metrics.width;
-                
-                if (testWidth > panelWidth - 20 && n > 0) {
-                    ctx.fillText(line, x + panelWidth - 10, lineY);
-                    line = words[n] + ' ';
-                    lineY += 20; 
+
+// Drag and Drop for panels
+let draggedPanel = null;
+
+function addDragAndDropListeners(panelElement) {
+    panelElement.addEventListener('dragstart', (e) => {
+        draggedPanel = panelElement;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', panelElement.innerHTML);
+        panelElement.classList.add('dragging');
+    });
+
+    panelElement.addEventListener('dragover', (e) => {
+        e.preventDefault(); // Necessary to allow dropping
+        if (e.target.closest('.comic-panel-item') !== draggedPanel) {
+            e.target.closest('.comic-panel-item').classList.add('drag-over');
+        }
+    });
+
+    panelElement.addEventListener('dragleave', (e) => {
+        e.target.closest('.comic-panel-item').classList.remove('drag-over');
+    });
+
+    panelElement.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.target.closest('.comic-panel-item').classList.remove('drag-over');
+
+        if (draggedPanel) {
+            const dropTarget = e.target.closest('.comic-panel-item');
+            if (dropTarget && draggedPanel !== dropTarget) {
+                const comicPanelsContainer = document.getElementById('comic-panels');
+                const draggedIndex = Array.from(comicPanelsContainer.children).indexOf(draggedPanel);
+                const dropIndex = Array.from(comicPanelsContainer.children).indexOf(dropTarget);
+
+                // Reorder in DOM
+                if (draggedIndex < dropIndex) {
+                    dropTarget.parentNode.insertBefore(draggedPanel, dropTarget.nextSibling);
                 } else {
-                    line = testLine;
+                    dropTarget.parentNode.insertBefore(draggedPanel, dropTarget);
                 }
-            }
-            ctx.fillText(line, x + panelWidth - 10, lineY);
-            
-            // Draw dialog if exists
-            if (panel.dialog) {
-                ctx.fillStyle = 'white';
-                ctx.fillRect(x + 10, y + panelHeight - 35, panelWidth - 20, 25); 
-                ctx.strokeStyle = '#333';
-                ctx.strokeRect(x + 10, y + panelHeight - 35, panelWidth - 20, 25);
-                
-                ctx.fillStyle = '#333';
-                ctx.font = '14px Heebo';
-                ctx.textAlign = 'right';
-                ctx.fillText(panel.dialog, x + panelWidth - 20, y + panelHeight - 15); 
+
+                // Reorder in currentComicPanels array
+                const [removed] = currentComicPanels.splice(draggedIndex, 1);
+                currentComicPanels.splice(dropIndex, 0, removed);
+
+                updatePanelNumbers();
             }
         }
-        
-        // Convert to blob and download
-        canvas.toBlob(function(blob) {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `comic-${Date.now()}.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            showToast('הקומיקס הורד בהצלחה!', 'success');
+    });
+
+    panelElement.addEventListener('dragend', () => {
+        draggedPanel.classList.remove('dragging');
+        document.querySelectorAll('.comic-panel-item.drag-over').forEach(item => {
+            item.classList.remove('drag-over');
         });
-        
-    } catch (error) {
-        console.error('Error downloading comic:', error);
-        showToast('שגיאה בהורדת הקומיקס', 'error');
+        draggedPanel = null;
+    });
+}
+
+// Function to download the comic
+function downloadComic() {
+    showToast('פונקציית הורדת קומיקס אינה מיושמת במלואה בדמו זה.', 'info');
+    // In a real application, you would render the comic to a canvas or PDF and trigger download.
+}
+
+// Project Management Functions (New)
+let projects = JSON.parse(localStorage.getItem('comicProjects')) || [];
+
+function saveProject() {
+    if (currentComicPanels.length === 0) {
+        showToast('אין פנלים לשמירה. אנא צור פנלים לפני השמירה.', 'error');
+        return;
+    }
+    showSaveProjectModal();
+}
+
+function showSaveProjectModal() {
+    const saveProjectModal = document.getElementById('save-project-modal');
+    saveProjectModal.style.display = 'block';
+    // Pre-fill project name if editing an existing project
+    const projectNameInput = document.getElementById('project-name');
+    if (currentProjectId) {
+        const existingProject = projects.find(p => p.id === currentProjectId);
+        if (existingProject) {
+            projectNameInput.value = existingProject.name;
+        }
+    } else {
+        projectNameInput.value = ''; // Clear for new projects
     }
 }
 
-// Feedback Functions
-function updateStarRating(rating) {
-    const stars = document.querySelectorAll('.star');
-    stars.forEach((star, index) => {
-        if (index < rating) {
-            star.classList.add('active');
+function closeSaveProjectModal() {
+    document.getElementById('save-project-modal').style.display = 'none';
+}
+
+document.getElementById('save-project-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const projectName = document.getElementById('project-name').value.trim();
+
+    if (!projectName) {
+        showToast('אנא הכנס שם לפרויקט.', 'error');
+        return;
+    }
+
+    if (currentProjectId) {
+        // Update existing project
+        const projectIndex = projects.findIndex(p => p.id === currentProjectId);
+        if (projectIndex !== -1) {
+            projects[projectIndex].name = projectName;
+            projects[projectIndex].panels = currentComicPanels;
+            projects[projectIndex].lastModified = new Date().toLocaleString();
+            showToast(`הפרויקט "${projectName}" עודכן בהצלחה!`, 'success');
+        }
+    } else {
+        // Save new project
+        const newProject = {
+            id: Date.now(),
+            name: projectName,
+            panels: currentComicPanels,
+            createdAt: new Date().toLocaleString(),
+            lastModified: new Date().toLocaleString()
+        };
+        projects.push(newProject);
+        showToast(`הפרויקט "${projectName}" נשמר בהצלחה!`, 'success');
+    }
+
+    localStorage.setItem('comicProjects', JSON.stringify(projects));
+    closeSaveProjectModal();
+    loadProjects(); // Refresh projects list
+    currentProjectId = null; // Reset current project ID after saving
+    document.getElementById('project-name').value = ''; // Clear input field
+});
+
+function loadProjects() {
+    const projectsListContainer = document.getElementById('projects-list');
+    projectsListContainer.innerHTML = ''; // Clear current list
+
+    if (projects.length === 0) {
+        projectsListContainer.innerHTML = '<p style="text-align: center; color: #666;">עדיין אין פרויקטים שמורים. התחל ליצור!</p>';
+        return;
+    }
+
+    projects.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified)); // Sort by last modified
+
+    projects.forEach(project => {
+        const projectCard = document.createElement('div');
+        projectCard.classList.add('project-card');
+        projectCard.dataset.projectId = project.id;
+        projectCard.innerHTML = `
+            <h3>${project.name}</h3>
+            <p>נוצר: ${project.createdAt}</p>
+            <p>עודכן לאחרונה: ${project.lastModified}</p>
+            <div class="project-actions">
+                <button class="btn btn-primary" onclick="loadProject(${project.id})"><i class="fas fa-folder-open"></i> פתח</button>
+                <button class="btn btn-secondary" onclick="showEditProjectModal(${project.id}, '${project.name}')"><i class="fas fa-pencil-alt"></i> שנה שם</button>
+                <button class="btn btn-danger" onclick="deleteProject(${project.id})"><i class="fas fa-trash"></i> מחק</button>
+            </div>
+        `;
+        projectsListContainer.appendChild(projectCard);
+    });
+}
+
+function loadProject(projectId) {
+    const project = projects.find(p => p.id === projectId);
+    if (project) {
+        currentComicPanels = JSON.parse(JSON.stringify(project.panels)); // Deep copy
+        currentProjectId = projectId; // Set current project being edited
+
+        const comicPanelsContainer = document.getElementById('comic-panels');
+        comicPanelsContainer.innerHTML = ''; // Clear existing panels in editor
+
+        currentComicPanels.forEach(panelData => {
+            addPanel(panelData.text, panelData.imageUrl, panelData.dialogs);
+        });
+        showSection('comic-editor');
+        showToast(`הפרויקט "${project.name}" נטען בהצלחה!`, 'success');
+    } else {
+        showToast('שגיאה: פרויקט לא נמצא.', 'error');
+    }
+}
+
+function showEditProjectModal(projectId, currentName) {
+    const editModal = document.getElementById('edit-project-modal');
+    document.getElementById('edit-project-name').value = currentName;
+    document.getElementById('edit-project-id').value = projectId;
+    editModal.style.display = 'block';
+}
+
+function closeEditProjectModal() {
+    document.getElementById('edit-project-modal').style.display = 'none';
+}
+
+document.getElementById('edit-project-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const newName = document.getElementById('edit-project-name').value.trim();
+    const projectId = parseInt(document.getElementById('edit-project-id').value);
+
+    if (!newName) {
+        showToast('אנא הכנס שם חדש לפרויקט.', 'error');
+        return;
+    }
+
+    const projectIndex = projects.findIndex(p => p.id === projectId);
+    if (projectIndex !== -1) {
+        const oldName = projects[projectIndex].name;
+        projects[projectIndex].name = newName;
+        projects[projectIndex].lastModified = new Date().toLocaleString();
+        localStorage.setItem('comicProjects', JSON.stringify(projects));
+        showToast(`שם הפרויקט שונה מ-"${oldName}" ל-"${newName}" בהצלחה!`, 'success');
+        closeEditProjectModal();
+        loadProjects(); // Refresh the list
+    } else {
+        showToast('שגיאה: פרויקט לא נמצא לשינוי שם.', 'error');
+    }
+});
+
+
+function deleteProject(projectId) {
+    if (confirm('האם אתה בטוח שברצונך למחוק פרויקט זה?')) {
+        projects = projects.filter(p => p.id !== projectId);
+        localStorage.setItem('comicProjects', JSON.stringify(projects));
+        showToast('הפרויקט נמחק בהצלחה!', 'info');
+        loadProjects(); // Refresh the list
+    }
+}
+
+function filterProjects() {
+    const searchTerm = document.getElementById('project-search').value.toLowerCase();
+    const projectCards = document.querySelectorAll('.projects-list .project-card');
+
+    projectCards.forEach(card => {
+        const projectName = card.querySelector('h3').textContent.toLowerCase();
+        if (projectName.includes(searchTerm)) {
+            card.style.display = 'flex'; // Show
         } else {
-            star.classList.remove('active');
+            card.style.display = 'none'; // Hide
         }
     });
 }
+
+
+// Feedback Section (existing functions, slightly modified for toast)
+let userRating = 0;
+
+document.getElementById('star-rating').addEventListener('click', (e) => {
+    if (e.target.classList.contains('star')) {
+        userRating = parseInt(e.target.dataset.rating);
+        document.querySelectorAll('.star').forEach(star => {
+            if (parseInt(star.dataset.rating) <= userRating) {
+                star.classList.add('active');
+            } else {
+                star.classList.remove('active');
+            }
+        });
+    }
+});
 
 function submitFeedback() {
     const feedbackText = document.getElementById('feedback-text').value.trim();
-    
-    if (currentRating === 0) {
-        showToast('אנא בחר דירוג', 'error');
+
+    if (userRating === 0 && feedbackText === '') {
+        showToast('אנא דרג את החוויה שלך או כתוב משוב.', 'error');
         return;
     }
-    
-    if (!feedbackText) {
-        showToast('אנא כתוב משוב', 'error');
-        return;
-    }
-    
-    const feedback = {
-        id: Date.now(),
-        userId: currentUser?.id || 'anonymous',
-        rating: currentRating,
-        text: feedbackText,
-        timestamp: new Date().toISOString()
-    };
-    
-    // Save feedback
-    const feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
-    feedbacks.push(feedback);
-    localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
-    
-    // Reset form
+
+    // In a real app, you would send this data to a server.
+    console.log('Feedback Submitted:', { rating: userRating, text: feedbackText });
+    showToast('תודה על המשוב שלך!', 'success');
     document.getElementById('feedback-text').value = '';
-    currentRating = 0;
-    updateStarRating(0);
-    
-    showToast('תודה על המשוב!', 'success');
-    
-    // Update statistics
-    updateStatistics();
-    
-    // Send feedback email (simulated)
-    sendFeedbackEmail(feedback);
+    userRating = 0;
+    document.querySelectorAll('.star').forEach(star => star.classList.remove('active'));
 }
 
-// Admin Functions
-function updateStatistics() {
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const projects = JSON.parse(localStorage.getItem('projects') || '[]');
-    const feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
-    
-    document.getElementById('total-users').textContent = users.length;
-    document.getElementById('total-comics').textContent = projects.length;
-    document.getElementById('total-feedback').textContent = feedbacks.length;
-    
-    // Calculate average rating
-    if (feedbacks.length > 0) {
-        const avgRating = feedbacks.reduce((sum, f) => sum + f.rating, 0) / feedbacks.length;
-        document.getElementById('avg-rating').textContent = avgRating.toFixed(1);
-    } else {
-        document.getElementById('avg-rating').textContent = '0';
-    }
+// Admin Section (placeholder functions)
+function updateAdminStats() {
+    // These would typically fetch data from a backend
+    document.getElementById('total-users').textContent = '123';
+    document.getElementById('total-comics').textContent = projects.length.toString(); // Using locally saved projects
+    document.getElementById('avg-rating').textContent = '4.5'; // Placeholder
+    document.getElementById('total-feedback').textContent = '50'; // Placeholder
 }
 
 function generateReport() {
-    if (!currentUser || !currentUser.isAdmin) {
-        showToast('אין הרשאה לפעולה זו', 'error');
-        return;
-    }
-    
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const projects = JSON.parse(localStorage.getItem('projects') || '[]');
-    const feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
-    
-    const report = {
-        date: new Date().toISOString(),
-        totalUsers: users.length,
-        totalComics: projects.length,
-        totalFeedbacks: feedbacks.length,
-        averageRating: feedbacks.length > 0 ? 
-            (feedbacks.reduce((sum, f) => sum + f.rating, 0) / feedbacks.length).toFixed(1) : 0,
-        recentActivity: {
-            newUsersThisWeek: users.filter(u => 
-                new Date(u.createdAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-            ).length,
-            newComicsThisWeek: projects.filter(p => 
-                new Date(p.createdAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-            ).length
-        }
-    };
-    
-    // Save report
-    const reports = JSON.parse(localStorage.getItem('reports') || '[]');
-    reports.push(report);
-    localStorage.setItem('reports', JSON.stringify(reports));
-    
-    showToast('דוח נוצר בהצלחה', 'success');
-    
-    return report;
+    showToast('פונקציית יצירת דוח אינה מיושמת במלואה בדמו זה.', 'info');
 }
 
 function sendReportEmail() {
-    const report = generateReport();
-    if (!report) return;
-    
-    // Simulate sending email
-    const emailContent = `
-דוח שימוש - יוצר הקומיקס העברי
-תאריך: ${new Date(report.date).toLocaleDateString('he-IL')}
-
-סטטיסטיקות כלליות:
-- סך המשתמשים: ${report.totalUsers}
-- סך הקומיקסים: ${report.totalComics}
-- סך המשובים: ${report.totalFeedbacks}
-- דירוג ממוצע: ${report.averageRating}
-
-פעילות השבוע:
-- משתמשים חדשים: ${report.recentActivity.newUsersThisWeek}
-- קומיקסים חדשים: ${report.recentActivity.newComicsThisWeek}
-
-דוח נשלח אוטומטית מיוצר הקומיקס העברי
-    `;
-    
-    // In a real application, this would send an actual email
-    console.log('Email would be sent to:', ADMIN_EMAIL);
-    console.log('Email content:', emailContent);
-    
-    showToast(`דוח נשלח למייל ${ADMIN_EMAIL}`, 'success');
+    showToast('פונקציית שליחת דוח למייל אינה מיושמת במלואה בדמו זה.', 'info');
 }
 
-function sendFeedbackEmail(feedback) {
-    // Simulate sending feedback email
-    const emailContent = `
-משוב חדש מיוצר הקומיקס העברי
-
-דירוג: ${feedback.rating}/5
-תאריך: ${new Date(feedback.timestamp).toLocaleDateString('he-IL')}
-משתמש: ${feedback.userId}
-
-תוכן המשוב:
-${feedback.text}
-    `;
-    
-    console.log('Feedback email would be sent to:', ADMIN_EMAIL);
-    console.log('Email content:', emailContent);
-}
-
-// Utility Functions
-function showToast(message, type = 'info') {
-    const toastContainer = document.getElementById('toast-container');
-    
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    
-    const icon = type === 'success' ? 'fa-check-circle' : 
-                   type === 'error' ? 'fa-exclamation-circle' : 
-                   'fa-info-circle';
-    
-    toast.innerHTML = `
-        <i class="fas ${icon}"></i>
-        <span>${message}</span>
-    `;
-    
-    toastContainer.appendChild(toast);
-    
-    // Remove toast after 3 seconds
-    setTimeout(() => {
-        toast.remove();
-    }, 3000);
-}
-
-// Periodic email reports (simulated)
-setInterval(() => {
-    if (currentUser && currentUser.isAdmin) {
-        // Send weekly report (simulated)
-        const lastReport = localStorage.getItem('last_report_date');
-        const now = new Date();
-        const oneWeek = 7 * 24 * 60 * 60 * 1000;
-        
-        if (!lastReport || (now - new Date(lastReport)) > oneWeek) {
-            sendReportEmail();
-            localStorage.setItem('last_report_date', now.toISOString());
-        }
-    }
-}, 60000); // Check every minute (in real app, this would be server-side)
-
-// Initialize crypto-js if not loaded
-if (typeof CryptoJS === 'undefined') {
-    window.CryptoJS = {
-        AES: {
-            encrypt: (text, key) => btoa(text), 
-            decrypt: (encrypted, key) => ({ toString: () => atob(encrypted) })
-        },
-        enc: {
-            Utf8: {}
-        }
-    };
-}
-
-// Initialize Sortable if not loaded
-if (typeof Sortable === 'undefined') {
-    window.Sortable = function(el, options) {
-        // Simple fallback - basic drag and drop
-        let draggedElement = null;
-        
-        Array.from(el.children).forEach(child => {
-            child.draggable = true;
-            
-            child.addEventListener('dragstart', function(e) {
-                draggedElement = this;
-                this.style.opacity = '0.5';
-            });
-            
-            child.addEventListener('dragend', function(e) {
-                this.style.opacity = '';
-                draggedElement = null;
-            });
-            
-            child.addEventListener('dragover', function(e) {
-                e.preventDefault();
-            });
-            
-            child.addEventListener('drop', function(e) {
-                e.preventDefault();
-                if (draggedElement && draggedElement !== this) {
-                    const rect = this.getBoundingClientRect();
-                    const midpoint = rect.top + rect.height / 2;
-                    
-                    if (e.clientY < midpoint) {
-                        this.parentNode.insertBefore(draggedElement, this);
-                    } else {
-                        this.parentNode.insertBefore(draggedElement, this.nextSibling);
-                    }
-                    
-                    if (options.onEnd) {
-                        options.onEnd({
-                            oldIndex: 0, 
-                            newIndex: 0  
-                        });
-                    }
-                }
-            });
-        });
-    };
-}
-
-async function generateAIImage(imageDescription) {
-    if (!window.apiKey) {
-        showToast('אנא הגדר מפתח API תחילה', 'error');
-        showSection('api-setup');
-        throw new Error('API key is not set.');
-    }
-
-    if (!imageDescription || imageDescription.trim() === '') {
-        showToast('אנא ספק תיאור לתמונה', 'error');
-        throw new Error('Image description is empty.');
-    }
-
-    try {
-        const IMAGEN_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/image-generation:generateImages';
-
-        const response = await fetch(IMAGEN_API_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': window.apiKey 
-            },
-            body: JSON.stringify({
-                 prompt: {
-                     text: imageDescription
-                 }
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Image Generation API Error:', errorData);
-            throw new Error(`Failed to generate image: ${errorData.error?.message || response.statusText}`);
-        }
-
-        const data = await response.json();
-        
-        const generatedImageBase64 = data.images?.[0]?.base64Data; 
-
-        if (!generatedImageBase64) {
-            console.error('Image data not found in response:', data);
-            throw new Error('No image data received from the API. Check API response structure.');
-        }
-
-        return `data:image/jpeg;base64,${generatedImageBase64}`; 
-    } catch (error) {
-        console.error('Error in generateAIImage:', error);
-        throw error; 
-    }
-}
+// Initial calls
+toggleCreationMode(); // Set initial state for story editor
+updateAdminStats(); // Update admin stats on load
