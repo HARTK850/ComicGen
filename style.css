@@ -363,6 +363,13 @@ body {
   font-size: 1rem;
   transition: all 0.3s ease;
   background: white;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667eea' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: left 10px center;
+  background-size: 20px;
+  padding-left: 40px;
 }
 
 .form-group input:focus,
@@ -487,6 +494,36 @@ body {
   min-height: 200px;
 }
 
+.story-output-page {
+  margin-bottom: 20px;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.comic-page-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.page-loading,
+.page-error,
+.page-placeholder {
+  padding: 60px 20px;
+  text-align: center;
+  background: #f8f9fa;
+  color: #666;
+}
+
+.page-loading i {
+  font-size: 2rem;
+  color: #667eea;
+  margin-bottom: 10px;
+}
+
 /* Comic Editor */
 .comic-editor-container {
   max-width: 1000px;
@@ -576,6 +613,20 @@ body {
   min-height: 80px;
   font-size: 0.9rem;
   line-height: 1.5;
+}
+
+.panel-text-item {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.panel-text-item:last-child {
+  margin-bottom: 0;
 }
 
 .panel-image {
@@ -1036,10 +1087,25 @@ body {
   font-size: 1.5rem;
 }
 
+.settings-section .api-form {
+  margin-top: 15px;
+}
+
+.settings-section .api-help {
+  margin-top: 15px;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.settings-section .api-help p {
+  margin-bottom: 10px;
+}
+
 .panel-generated-image {
-  max-width: 100%; /* ודא שהרוחב לא חורג מהקונטיינר */
-  max-height: 100%; /* ודא שהגובה לא חורג מהקונטיינר */
-  object-fit: contain; /* או cover, בהתאם לאיך שאתה רוצה שהתמונה תמלא את הריבוע */
-  display: block; /* מונע רווחים מיותרים מתחת לתמונה */
-  margin: 0 auto; /* ממקם את התמונה במרכז אם היא קטנה מהקונטיינר */
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
 }
