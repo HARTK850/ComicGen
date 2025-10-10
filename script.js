@@ -4,6 +4,9 @@ let globalApiKey = null
 let storyModel = "gemini-2.5-flash" // Default model
 let imageModel = "gemini-2.5-flash-image" // Default image model
 
+let totalPages = 0
+let completedPages = 0
+
 document.addEventListener("DOMContentLoaded", () => {
   // Hide loading screen
   const loadingScreen = document.getElementById("loading-screen")
@@ -176,9 +179,16 @@ async function processStory() {
 
   if (!globalApiKey) {
     showToast("אנא הגדר מפתח API תחילה", "error")
-    showSection("api-setup")
+    showSection("settings")
     return
   }
+
+  const createBtn = document.getElementById("create-btn")
+  const createBtnText = document.getElementById("create-btn-text")
+  createBtn.disabled = true
+  totalPages = 0
+  completedPages = 0
+  updateProgress(0)
 
   showToast("מעבד את הסיפור ומחלק לעמודי קומיקס...", "info")
 
@@ -198,6 +208,8 @@ async function processStory() {
 
 הסיפור:
 ${storyText}`
+
+    updateProgress(10)
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${storyModel}:generateContent?key=${globalApiKey}`,
@@ -219,12 +231,14 @@ ${storyText}`
     const data = await response.json()
     let pagesText = data.candidates[0]?.content?.parts?.[0]?.text
 
-    // Clean JSON from markdown code blocks if present
     pagesText = pagesText
       .replace(/```json\n?/g, "")
       .replace(/```\n?/g, "")
       .trim()
     const pages = JSON.parse(pagesText)
+
+    totalPages = pages.length
+    updateProgress(20)
 
     currentComicPanels = pages.map((page) => ({
       id: Date.now() + page.pageNumber,
@@ -238,28 +252,51 @@ ${storyText}`
     renderComicPanels()
     showToast("הסיפור חולק לעמודי קומיקס. יוצר תמונות...", "info")
 
-    const imageGenerationPromises = currentComicPanels.map(async (page) => {
+    const imageGenerationPromises = currentComicPanels.map(async (page, index) => {
       try {
         const pagePrompt = createPagePrompt(page, document.getElementById("art-style").value)
         const imageUrl = await generateAIImage(pagePrompt)
         page.imageUrl = imageUrl
         page.imageLoading = false
+
+        completedPages++
+        const progress = 20 + Math.floor((completedPages / totalPages) * 80)
+        updateProgress(progress)
+
         renderComicPanels()
+        displayStoryOutput(currentComicPanels)
       } catch (error) {
         console.error(`Error generating image for page ${page.pageNumber}:`, error)
         page.imageLoading = false
         page.imageUrl = "error"
+
+        completedPages++
+        const progress = 20 + Math.floor((completedPages / totalPages) * 80)
+        updateProgress(progress)
+
         renderComicPanels()
+        displayStoryOutput(currentComicPanels)
         showToast(`שגיאה ביצירת תמונה עבור עמוד ${page.pageNumber}`, "error")
       }
     })
 
     await Promise.all(imageGenerationPromises)
+
+    updateProgress(100)
     showToast("כל עמודי הקומיקס נוצרו!", "success")
+
+    setTimeout(() => {
+      createBtn.disabled = false
+      createBtnText.textContent = "יצירת הקומיקס"
+    }, 1000)
+
     showSection("comic-editor")
   } catch (error) {
     console.error("Error processing story:", error)
     showToast(`שגיאה בעיבוד הסיפור: ${error.message}`, "error")
+
+    createBtn.disabled = false
+    createBtnText.textContent = "יצירת הקומיקס"
   }
 }
 
@@ -283,7 +320,7 @@ function createPagePrompt(page, artStyle) {
 async function generateAIStory() {
   if (!globalApiKey) {
     showToast("אנא הגדר מפתח API תחילה", "error")
-    showSection("api-setup")
+    showSection("settings")
     return
   }
 
@@ -293,6 +330,11 @@ async function generateAIStory() {
     showToast("אנא הכנס תיאור לסיפור", "error")
     return
   }
+
+  const createAiBtn = document.getElementById("create-ai-btn")
+  const createAiBtnText = document.getElementById("create-ai-btn-text")
+  createAiBtn.disabled = true
+  updateProgress(0)
 
   showToast("יוצר סיפור אוטומטי...", "info")
 
@@ -334,12 +376,18 @@ async function generateAIStory() {
     document.getElementById("creation-type").value = "manual"
     toggleCreationMode()
 
+    showToast("סיפור נוצר בהצלחה! מתחיל ליצור קומיקס...", "success")
+
     await processStory()
 
-    showToast("סיפור נוצר בהצלחה!", "success")
+    createAiBtn.disabled = false
+    createAiBtnText.textContent = "יצירת הקומיקס"
   } catch (error) {
     console.error("Error generating story:", error)
     showToast(`שגיאה ביצירת הסיפור: ${error.message}`, "error")
+
+    createAiBtn.disabled = false
+    createAiBtnText.textContent = "יצירת הקומיקס"
   }
 }
 
@@ -411,31 +459,20 @@ function displayStoryOutput(pages) {
   }
   storyOutputContainer.innerHTML = ""
 
-  pages.forEach((page, index) => {
+  pages.forEach((page) => {
     const pageDiv = document.createElement("div")
-    pageDiv.classList.add("story-output-panel")
+    pageDiv.classList.add("story-output-page")
 
-    let panelsHTML = ""
-    page.panels.forEach((panel) => {
-      panelsHTML += `<p><strong>פאנל ${panel.panelNumber}:</strong> ${panel.description}</p>`
-      if (panel.dialog) {
-        panelsHTML += `<p><em>דיאלוג: ${panel.dialog}</em></p>`
-      }
-    })
+    if (page.imageLoading) {
+      pageDiv.innerHTML = '<div class="page-loading"><i class="fas fa-spinner fa-spin"></i><p>טוען עמוד...</p></div>'
+    } else if (page.imageUrl === "error") {
+      pageDiv.innerHTML = '<div class="page-error"><p style="color: red;">שגיאה בטעינת תמונה.</p></div>'
+    } else if (page.imageUrl) {
+      pageDiv.innerHTML = `<img src="${page.imageUrl}" alt="עמוד ${page.pageNumber}" loading="eager" class="comic-page-image">`
+    } else {
+      pageDiv.innerHTML = '<div class="page-placeholder"><p>ממתין ליצירת תמונה...</p></div>'
+    }
 
-    pageDiv.innerHTML = `
-            <h4>עמוד ${page.pageNumber}</h4>
-            ${panelsHTML}
-            ${
-              page.imageLoading
-                ? '<p>טוען תמונה... <i class="fas fa-spinner fa-spin"></i></p>'
-                : page.imageUrl === "error"
-                  ? '<p style="color: red;">שגיאה בטעינת תמונה.</p>'
-                  : page.imageUrl
-                    ? `<img src="${page.imageUrl}" alt="Page Image" loading="eager">`
-                    : "<p>אין תמונה</p>"
-            }
-        `
     storyOutputContainer.appendChild(pageDiv)
   })
 }
@@ -900,11 +937,24 @@ function updateAdminStats() {
 }
 
 function generateReport() {
-  showToast("פונקציית יצירת דוח אינה מיושמת במלואה בדמו זה.", "info")
+  showToast("פונקציית יצירת דוח אינה מיושמת במלואה ב демо זה.", "info")
 }
 
 function sendReportEmail() {
-  showToast("פונקציית שליחת דוח למייל אינה מיושמת במלואה בדמו זה.", "info")
+  showToast("פונקציית שליחת דוח למייל אינה מיושמת במלואה ב демо זה.", "info")
+}
+
+function updateProgress(percentage) {
+  const createBtnText = document.getElementById("create-btn-text")
+  const createAiBtnText = document.getElementById("create-ai-btn-text")
+
+  if (percentage < 100) {
+    createBtnText.textContent = `${percentage}%`
+    createAiBtnText.textContent = `${percentage}%`
+  } else {
+    createBtnText.textContent = "100%"
+    createAiBtnText.textContent = "100%"
+  }
 }
 
 // Initial calls
