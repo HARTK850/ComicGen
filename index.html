@@ -25,10 +25,6 @@
                     <i class="fas fa-home"></i>
                     <span>בית</span>
                 </button>
-                <button class="nav-btn" onclick="showSection('api-setup')">
-                    <i class="fas fa-key"></i>
-                    <span>הגדרת API</span>
-                </button>
                 <button class="nav-btn" onclick="showSection('settings')">
                     <i class="fas fa-cog"></i>
                     <span>הגדרות</span>
@@ -68,7 +64,7 @@
                             <i class="fas fa-rocket"></i>
                             התחל ליצור
                         </button>
-                        <button class="btn btn-secondary" onclick="showSection('api-setup')">
+                        <button class="btn btn-secondary" onclick="showSection('settings')">
                             <i class="fas fa-cog"></i>
                             הגדרות
                         </button>
@@ -100,18 +96,20 @@
                         <p>עובד מושלם בכל המכשירים</p>
                     </div>
                     <div class="feature-card">
-                        <i class="fas fa-cloud"></i>
-                        <h3>שמירה בענן</h3>
+                        <i class="fas fa-save"></i>
+                        <h3>שמירה בדפדפן</h3>
                         <p>הפרויקטים שלכם נשמרים בבטחה</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <section id="api-setup" class="section">
+        <section id="settings" class="section">
             <div class="container">
-                <h2><i class="fas fa-key"></i> הגדרת מפתח API</h2>
-                <div class="api-setup-card">
+                <h2><i class="fas fa-cog"></i> הגדרות</h2>
+                
+                <div class="settings-section">
+                    <h3><i class="fas fa-key"></i> מפתח API</h3>
                     <div class="api-form">
                         <div class="form-group">
                             <label for="api-key">מפתח Gemini AI:</label>
@@ -127,56 +125,49 @@
                             בדוק ושמור
                         </button>
                         <div id="api-status" class="api-status"></div>
-                    </div>
-                    <div class="api-help">
-                        <h3>איך להשיג מפתח API?</h3>
-                        <ol>
-                            <li>היכנס ל-<a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a></li>
-                            <li>צור מפתח API חדש</li>
-                            <li>העתק את המפתח והדבק אותו כאן</li>
-                        </ol>
+                        <div class="api-help">
+                            <p><strong>איך להשיג מפתח API?</strong></p>
+                            <ol>
+                                <li>היכנס ל-<a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a></li>
+                                <li>צור מפתח API חדש</li>
+                                <li>העתק את המפתח והדבק אותו כאן</li>
+                            </ol>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
 
-        <section id="settings" class="section">
-            <div class="container">
-                <h2><i class="fas fa-cog"></i> הגדרות מודלים</h2>
-                <div class="settings-container">
-                    <div class="settings-section">
-                        <h3>מודל ליצירת סיפור וחלוקה לפאנלים</h3>
-                        <div class="form-group">
-                            <label for="story-model">בחר מודל:</label>
-                            <select id="story-model">
-                                <option value="gemini-2.5-flash">Gemini 2.5 Flash - מהיר וחכם</option>
-                                <option value="gemini-2.5-pro">Gemini 2.5 Pro - איכות מקסימלית</option>
-                                <option value="gemini-1.5-flash">Gemini 1.5 Flash - מהיר ויעיל</option>
-                                <option value="gemini-1.5-pro">Gemini 1.5 Pro - מאוזן ומדויק</option>
-                                <option value="gemini-exp-1206">Gemini Exp 1206 - ניסיוני מתקדם</option>
-                                <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp - דור חדש</option>
-                                <option value="gemini-exp-1121">Gemini Exp 1121 - ניסיוני משופר</option>
-                            </select>
-                        </div>
+                <div class="settings-section">
+                    <h3>מודל ליצירת הקומיקס</h3>
+                    <div class="form-group">
+                        <label for="story-model">בחר מודל:</label>
+                        <select id="story-model" class="styled-select">
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash - מהיר וחכם</option>
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro - איכות מקסימלית</option>
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash - מהיר ויעיל</option>
+                            <option value="gemini-1.5-pro">Gemini 1.5 Pro - מאוזן ומדויק</option>
+                            <option value="gemini-exp-1206">Gemini Exp 1206 - ניסיוני מתקדם</option>
+                            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp - דור חדש</option>
+                            <option value="gemini-exp-1121">Gemini Exp 1121 - ניסיוני משופר</option>
+                        </select>
                     </div>
-                    
-                    <div class="settings-section">
-                        <h3>מודל ליצירת תמונות קומיקס</h3>
-                        <div class="form-group">
-                            <label for="image-model">בחר מודל:</label>
-                            <select id="image-model">
-                                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image - מהיר ואיכותי</option>
-                                <option value="gemini-2.0-flash-image">Gemini 2.0 Flash Image - מאוזן ומהיר</option>
-                                <option value="imagen-4">Imagen 4 - איכות מקסימלית</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <button onclick="saveSettings()" class="btn btn-primary">
-                        <i class="fas fa-save"></i>
-                        שמור הגדרות
-                    </button>
                 </div>
+                
+                <div class="settings-section">
+                    <h3>מודל ליצירת תמונות קומיקס</h3>
+                    <div class="form-group">
+                        <label for="image-model">בחר מודל:</label>
+                        <select id="image-model" class="styled-select">
+                            <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image - מהיר ואיכותי</option>
+                            <option value="gemini-2.0-flash-image">Gemini 2.0 Flash Image - מאוזן ומהיר</option>
+                            <option value="imagen-4">Imagen 4 - איכות מקסימלית</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button onclick="saveSettings()" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    שמור הגדרות
+                </button>
             </div>
         </section>
 
@@ -187,14 +178,14 @@
                     <div class="story-controls">
                         <div class="control-group">
                             <label>סוג יצירה:</label>
-                            <select id="creation-type" onchange="toggleCreationMode()">
+                            <select id="creation-type" class="styled-select" onchange="toggleCreationMode()">
                                 <option value="manual">כתיבה ידנית</option>
                                 <option value="ai">יצירה אוטומטית</option>
                             </select>
                         </div>
                         <div class="control-group">
                             <label>סגנון איור:</label>
-                            <select id="art-style">
+                            <select id="art-style" class="styled-select">
                                 <option value="anime">אנימה</option>
                                 <option value="realistic">ריאליסטי</option>
                                 <option value="cartoon">קריקטורה</option>
@@ -207,11 +198,11 @@
                     <div id="manual-input" class="input-section">
                         <div class="form-group">
                             <label for="story-text">הכנס את הסיפור שלך:</label>
-                            <textarea id="story-text" placeholder="כתוב כאן את הסיפור שלך... המערכת תחלק אותו אוטומטית onPagei קומיקס"></textarea>
+                            <textarea id="story-text" placeholder="כתוב כאן את הסיפור שלך... המערכת תיצור עמודי קומיקס עם פאנלים, בועות דיבור וטקסט בעברית"></textarea>
                         </div>
-                        <button onclick="processStory()" class="btn btn-primary">
+                        <button id="create-btn" onclick="processStory()" class="btn btn-primary">
                             <i class="fas fa-magic"></i>
-                            צור עמודי קומיקס
+                            <span id="create-btn-text">יצירת הקומיקס</span>
                         </button>
                     </div>
 
@@ -222,9 +213,9 @@
                                 <textarea id="story-prompt" placeholder="למשל: סיפור הרפתקה על גיבור צעיר שנלחם בדרקון ביער קסום, או סיפור אהבה בעיר עתידנית..."></textarea>
                             </div>
                         </div>
-                        <button onclick="generateAIStory()" class="btn btn-primary">
+                        <button id="create-ai-btn" onclick="generateAIStory()" class="btn btn-primary">
                             <i class="fas fa-robot"></i>
-                            צור סיפור אוטומטי
+                            <span id="create-ai-btn-text">יצירת הקומיקס</span>
                         </button>
                     </div>
 
