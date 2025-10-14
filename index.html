@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Added jsPDF library for PDF export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
@@ -110,23 +109,26 @@
             <div class="container">
                 <h2><i class="fas fa-cog"></i> הגדרות</h2>
                 
+                <!-- Restructured API section with side-by-side layout -->
                 <div class="settings-section">
                     <h3><i class="fas fa-key"></i> מפתח API</h3>
-                    <div class="api-form">
-                        <div class="form-group">
-                            <label for="api-key">מפתח Gemini AI:</label>
-                            <div class="input-group">
-                                <input type="password" id="api-key" placeholder="הכנס את מפתח ה-API שלך">
-                                <button type="button" onclick="toggleApiKeyVisibility()" class="toggle-btn">
-                                    <i class="fas fa-eye" id="eye-icon"></i>
-                                </button>
+                    <div class="api-setup-card">
+                        <div class="api-form">
+                            <div class="form-group">
+                                <label for="api-key">מפתח Gemini AI:</label>
+                                <div class="input-group">
+                                    <input type="password" id="api-key" placeholder="הכנס את מפתח ה-API שלך">
+                                    <button type="button" onclick="toggleApiKeyVisibility()" class="toggle-btn">
+                                        <i class="fas fa-eye" id="eye-icon"></i>
+                                    </button>
+                                </div>
                             </div>
+                            <button onclick="validateApiKey()" class="btn btn-primary" id="validate-api-btn">
+                                <i class="fas fa-check"></i>
+                                <span id="validate-btn-text">בדוק ושמור</span>
+                            </button>
+                            <div id="api-status" class="api-status"></div>
                         </div>
-                        <button onclick="validateApiKey()" class="btn btn-primary">
-                            <i class="fas fa-check"></i>
-                            בדוק ושמור
-                        </button>
-                        <div id="api-status" class="api-status"></div>
                         <div class="api-help">
                             <p><strong>איך להשיג מפתח API?</strong></p>
                             <ol>
@@ -147,21 +149,29 @@
                             <option value="gemini-2.5-pro">Gemini 2.5 Pro - איכות מקסימלית</option>
                             <option value="gemini-1.5-flash">Gemini 1.5 Flash - מהיר ויעיל</option>
                             <option value="gemini-1.5-pro">Gemini 1.5 Pro - מאוזן ומדויק</option>
-                            <option value="gemini-exp-1206">Gemini Exp 1206 - ניסיוני מתקדם</option>
+                            <option value="gemini-exp-1206">Gemini Exp 1206 - דור חדש</option>
                             <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp - דור חדש</option>
                             <option value="gemini-exp-1121">Gemini Exp 1121 - ניסיוני משופר</option>
                         </select>
                     </div>
                 </div>
                 
+                <!-- Updated image models with more options -->
                 <div class="settings-section">
                     <h3>מודל ליצירת תמונות קומיקס</h3>
                     <div class="form-group">
                         <label for="image-model">בחר מודל:</label>
                         <select id="image-model" class="styled-select">
-                            <option value="imagen-3.0-generate-001">Imagen 3.0 - איכות מקסימלית</option>
-                            <option value="imagen-3.0-fast-generate-001">Imagen 3.0 Fast - מהיר ואיכותי</option>
+                            <option value="imagen-3.0-generate-001">Imagen 3.0 - איכות מקסימלית (דורש Vertex AI)</option>
+                            <option value="imagen-3.0-fast-generate-001">Imagen 3.0 Fast - מהיר ואיכותי (דורש Vertex AI)</option>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash - מומלץ לקומיקס</option>
+                            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp - ניסיוני מתקדם</option>
+                            <option value="gemini-exp-1206">Gemini Exp 1206 - דור חדש</option>
                         </select>
+                        <p style="font-size: 0.85rem; color: #666; margin-top: 8px;">
+                            <i class="fas fa-info-circle"></i>
+                            שים לב: מודלים של Imagen דורשים הגדרת Vertex AI נפרדת. מומלץ להשתמש במודלים של Gemini.
+                        </p>
                     </div>
                 </div>
                 
@@ -219,8 +229,6 @@
                             <span id="create-ai-btn-text">יצירת הקומיקס</span>
                         </button>
                     </div>
-
-                    <div id="story-output" class="story-output"></div>
                 </div>
             </div>
         </section>
