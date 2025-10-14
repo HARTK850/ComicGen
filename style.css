@@ -1005,6 +1005,10 @@ body {
   margin-bottom: 10px;
 }
 
+.settings-section .api-help a:hover {
+  text-decoration: underline;
+}
+
 .panel-generated-image {
   max-width: 100%;
   max-height: 100%;
@@ -1033,6 +1037,35 @@ body {
   border-radius: 50%;
   border-top-color: transparent;
   animation: spin 0.6s linear infinite;
+}
+
+/* Added info box style for Gemini 2.5 Flash Image notice */
+.info-box {
+  background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+  border: 2px solid #667eea;
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.info-box i {
+  font-size: 1.5rem;
+  color: #667eea;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.info-box p {
+  margin: 0;
+  color: #333;
+  line-height: 1.6;
+}
+
+.info-box p strong {
+  color: #667eea;
+  font-weight: 700;
 }
 
 /* Responsive Design */
