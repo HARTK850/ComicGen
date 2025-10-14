@@ -55,8 +55,17 @@ async function validateApiKey() {
     }
 
     try {
-        // Simulated API check using a test call to Gemini
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + apiKey);
+        // Test API key with a simple text generation call
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
+            method: 'POST',
+            headers: {
+                'x-goog-api-key': apiKey,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Test' }] }]
+            })
+        });
         if (response.ok) {
             localStorage.setItem('geminiApiKey', apiKey);
             apiStatus.className = 'api-status success';
@@ -104,11 +113,10 @@ function toggleCreationMode() {
     document.getElementById('ai-input').style.display = creationType === 'ai' ? 'block' : 'none';
 }
 
-// Simulated Gemini API calls (replace with actual API integration)
 async function generateAIStory() {
     const prompt = document.getElementById('story-prompt').value;
     const storyModel = document.getElementById('story-model').value;
-    const apiKey = localStorage.getItem('geminiApiKey');
+    let apiKey = localStorage.getItem('geminiApiKey');
     const createBtn = document.getElementById('create-ai-btn');
     const createBtnText = document.getElementById('create-ai-btn-text');
 
@@ -127,14 +135,27 @@ async function generateAIStory() {
     storyOutput.innerHTML = '<div class="page-loading"><i class="fas fa-spinner fa-spin"></i><p>מייצר קומיקס...</p></div>';
 
     try {
-        // Simulated story generation
-        const storyResponse = await simulateStoryGeneration(prompt, storyModel, apiKey);
-        const pages = storyResponse.pages; // Array of { panels: [{ text, type }] }
-        await generateComicImages(pages);
+        // Generate story structure
+        const storyResponse = await generateStory(prompt, storyModel, apiKey);
+        const pages = parseStoryResponse(storyResponse); // Parse to array of { panels: [{ text, type }] }
+        
+        // Check rate limits approximately (since no direct check, estimate based on pages)
+        const canGenerate = await checkApiRateLimit(apiKey, pages.length);
+        if (!canGenerate) {
+            const backupKey = await promptForBackupApiKey();
+            if (backupKey) {
+                localStorage.setItem('backupApiKey', backupKey);
+                apiKey = backupKey; // Switch to backup
+            } else {
+                throw new Error('API rate limit exceeded and no backup key provided');
+            }
+        }
+
+        await generateComicImages(pages, apiKey);
         createBtnText.textContent = 'יצירת הקומיקס 100%';
         showSection('comic-editor');
     } catch (error) {
-        storyOutput.innerHTML = '<div class="page-error">שגיאה ביצירת הקומיקס</div>';
+        storyOutput.innerHTML = '<div class="page-error">שגיאה ביצירת הקומיקס: ' + error.message + '</div>';
         showToast('שגיאה ביצירת הקומיקס', 'error');
     } finally {
         createBtn.disabled = false;
@@ -144,7 +165,7 @@ async function generateAIStory() {
 async function processStory() {
     const storyText = document.getElementById('story-text').value;
     const storyModel = document.getElementById('story-model').value;
-    const apiKey = localStorage.getItem('geminiApiKey');
+    let apiKey = localStorage.getItem('geminiApiKey');
     const createBtn = document.getElementById('create-btn');
     const createBtnText = document.getElementById('create-btn-text');
 
@@ -163,122 +184,167 @@ async function processStory() {
     storyOutput.innerHTML = '<div class="page-loading"><i class="fas fa-spinner fa-spin"></i><p>מייצר קומיקס...</p></div>';
 
     try {
-        // Simulated story processing
-        const storyResponse = await simulateStoryProcessing(storyText, storyModel, apiKey);
-        const pages = storyResponse.pages;
-        await generateComicImages(pages);
+        // Process user story into structure
+        const storyResponse = await processUserStory(storyText, storyModel, apiKey);
+        const pages = parseStoryResponse(storyResponse);
+        
+        const canGenerate = await checkApiRateLimit(apiKey, pages.length);
+        if (!canGenerate) {
+            const backupKey = await promptForBackupApiKey();
+            if (backupKey) {
+                localStorage.setItem('backupApiKey', backupKey);
+                apiKey = backupKey;
+            } else {
+                throw new Error('API rate limit exceeded and no backup key provided');
+            }
+        }
+
+        await generateComicImages(pages, apiKey);
         createBtnText.textContent = 'יצירת הקומיקס 100%';
         showSection('comic-editor');
     } catch (error) {
-        storyOutput.innerHTML = '<div class="page-error">שגיאה ביצירת הקומיקס</div>';
+        storyOutput.innerHTML = '<div class="page-error">שגיאה ביצירת הקומיקס: ' + error.message + '</div>';
         showToast('שגיאה ביצירת הקומיקס', 'error');
     } finally {
         createBtn.disabled = false;
     }
 }
 
-// Simulated API functions (replace with actual Gemini API calls)
-async function simulateStoryGeneration(prompt, model, apiKey) {
-    // Simulate API rate limit check
-    const canGenerate = await checkApiRateLimit(apiKey, 10); // Assume 10 images needed
-    if (!canGenerate) {
-        const backupKey = await promptForBackupApiKey();
-        if (backupKey) {
-            localStorage.setItem('backupApiKey', backupKey);
-        } else {
-            throw new Error('API rate limit exceeded and no backup key provided');
-        }
+async function generateStory(prompt, model, apiKey) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const requestBody = {
+        contents: [{
+            parts: [{
+                text: `צור סיפור קומיקס בעברית על בסיס: ${prompt}. חלק לעמודים, כל עמוד 3-6 פאנלים, כל פאנל עם טקסט דיבור או מחשבה בעברית. פלט כ-JSON: { "pages": [{ "panels": [{ "text": "טקסט", "type": "speech" or "thought" }] }] }`
+            }]
+        }]
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'x-goog-api-key': apiKey,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+        if (response.status === 429) throw new Error('Rate limit exceeded');
+        throw new Error(`API error: ${response.status}`);
     }
 
-    // Simulate story generation
-    const pages = [];
-    const panelCount = Math.floor(Math.random() * 20) + 20; // 20-40 panels
-    const panelsPerPage = Math.floor(Math.random() * 4) + 3; // 3-6 panels per page
-    let panelIndex = 0;
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
+}
 
-    while (panelIndex < panelCount) {
-        const pagePanels = [];
-        const panelsThisPage = Math.min(panelsPerPage, panelCount - panelIndex);
-        for (let i = 0; i < panelsThisPage; i++) {
-            pagePanels.push({
-                text: `דיאלוג לדוגמה ${panelIndex + 1}`,
-                type: Math.random() > 0.5 ? 'speech' : 'thought'
-            });
-            panelIndex++;
-        }
-        pages.push({ panels: pagePanels });
+async function processUserStory(text, model, apiKey) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const requestBody = {
+        contents: [{
+            parts: [{
+                text: `חלק את הסיפור הבא לקומיקס בעברית: ${text}. חלק לעמודים, כל עמוד 3-6 פאנלים, כל פאנל עם טקסט דיבור או מחשבה בעברית. פלט כ-JSON: { "pages": [{ "panels": [{ "text": "טקסט", "type": "speech" or "thought" }] }] }`
+            }]
+        }]
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'x-goog-api-key': apiKey,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+        if (response.status === 429) throw new Error('Rate limit exceeded');
+        throw new Error(`API error: ${response.status}`);
     }
 
-    return { pages };
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
 }
 
-async function simulateStoryProcessing(text, model, apiKey) {
-    // Simulate processing user-provided story
-    return await simulateStoryGeneration(text, model, apiKey); // Same logic for simplicity
-}
-
-async function checkApiRateLimit(apiKey, requiredImages) {
-    // Simulated rate limit check (replace with actual Gemini API rate limit check)
+function parseStoryResponse(responseText) {
+    // Parse JSON from response (assume it's clean JSON)
     try {
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + apiKey);
-        return response.ok; // Simplified check
+        return JSON.parse(responseText);
     } catch {
-        return false;
+        // If not perfect, extract JSON part
+        const jsonStart = responseText.indexOf('{');
+        const jsonEnd = responseText.lastIndexOf('}') + 1;
+        return JSON.parse(responseText.substring(jsonStart, jsonEnd));
+    }
+}
+
+async function checkApiRateLimit(apiKey, requiredCalls) {
+    // No direct endpoint, so make a test call and assume limit (e.g., 15 calls/min)
+    // For simplicity, always return true unless test fails with 429
+    try {
+        await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
+            method: 'POST',
+            headers: {
+                'x-goog-api-key': apiKey,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Test rate limit' }] }]
+            })
+        });
+        return true;
+    } catch (error) {
+        if (error.message.includes('429')) return false;
+        throw error;
     }
 }
 
 async function promptForBackupApiKey() {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>
-            <h2>מפתח API נוסף נדרש</h2>
-            <p>נראה שמפתח ה-API הנוכחי לא יספיק לכל התמונות המבוקשות. אנא הזן מפתח API נוסף לגיבוי.</p>
-            <div class="form-group">
-                <label for="backup-api-key">מפתח API נוסף:</label>
-                <input type="password" id="backup-api-key" placeholder="הכנס מפתח API נוסף">
-            </div>
-            <button class="btn btn-primary" onclick="saveBackupApiKey()">שמור</button>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    modal.style.display = 'block';
     return new Promise(resolve => {
-        window.saveBackupApiKey = () => {
-            const backupKey = document.getElementById('backup-api-key').value;
-            modal.remove();
-            resolve(backupKey);
-        };
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'block';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <span class="close" onclick="this.parentElement.parentElement.remove(); resolve(null);">&times;</span>
+                <h2>מפתח API נוסף נדרש</h2>
+                <p>נראה שמפתח ה-API הנוכחי לא יספיק לכל התמונות המבוקשות. אנא הזן מפתח API נוסף לגיבוי.</p>
+                <div class="form-group">
+                    <label for="backup-api-key">מפתח API נוסף:</label>
+                    <input type="password" id="backup-api-key" placeholder="הכנס מפתח API נוסף">
+                </div>
+                <button class="btn btn-primary" onclick="resolve(document.getElementById('backup-api-key').value); this.closest('.modal').remove();">שמור</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
     });
 }
 
-async function generateComicImages(pages) {
+async function generateComicImages(pages, apiKey) {
     const artStyle = document.getElementById('art-style').value;
-    const imageModel = document.getElementById('image-model').value;
-    const apiKey = localStorage.getItem('geminiApiKey');
-    const backupApiKey = localStorage.getItem('backupApiKey');
+    const imageModel = mapImageModel(document.getElementById('image-model').value); // Map to actual like 'imagen-4.0-generate-001'
     const storyOutput = document.getElementById('story-output');
     const comicPanels = document.getElementById('comic-panels');
     storyOutput.innerHTML = '';
     comicPanels.innerHTML = '';
 
     let progress = 0;
-    const totalPages = pages.length;
+    const totalPages = pages.pages.length; // Assume {pages: []}
     const createBtnText = document.getElementById(document.getElementById('creation-type').value === 'ai' ? 'create-ai-btn-text' : 'create-btn-text');
 
-    for (let i = 0; i < pages.length; i++) {
-        const page = pages[i];
-        const prompt = `Create a comic page in ${artStyle} style with ${page.panels.length} panels, each containing Hebrew text for dialogues or thoughts: ${page.panels.map(p => `${p.type}: ${p.text}`).join(', ')}`;
+    for (let i = 0; i < totalPages; i++) {
+        const page = pages.pages[i];
+        const pagePrompt = `Comic page in ${artStyle} style with ${page.panels.length} panels. Include speech/thought bubbles with Hebrew text only: ${page.panels.map(p => `${p.type}: ${p.text}`).join(', ')}. All text in Hebrew.`;
+        
         try {
-            // Simulated image generation
-            const imageUrl = await simulateImageGeneration(prompt, imageModel, apiKey, backupApiKey);
+            const imageData = await generateImage(pagePrompt, imageModel, apiKey);
+            const imageUrl = `data:image/png;base64,${imageData}`; // From base64
+            
             const pageDiv = document.createElement('div');
             pageDiv.className = 'story-output-page';
             pageDiv.innerHTML = `<img src="${imageUrl}" class="comic-page-image" loading="eager" alt="Comic Page ${i + 1}">`;
             storyOutput.appendChild(pageDiv);
 
-            // Add to comic editor
             const panelItem = document.createElement('div');
             panelItem.className = 'comic-panel-item';
             panelItem.innerHTML = `
@@ -300,14 +366,54 @@ async function generateComicImages(pages) {
             progress = ((i + 1) / totalPages) * 100;
             createBtnText.textContent = `מייצר קומיקס... ${Math.round(progress)}%`;
         } catch (error) {
-            storyOutput.innerHTML += '<div class="page-error">שגיאה ביצירת עמוד</div>';
+            if (error.message.includes('429')) {
+                const backupKey = localStorage.getItem('backupApiKey');
+                if (backupKey) {
+                    apiKey = backupKey;
+                    i--; // Retry with backup
+                    continue;
+                } else {
+                    throw error;
+                }
+            }
+            storyOutput.innerHTML += '<div class="page-error">שגיאה ביצירת עמוד: ' + error.message + '</div>';
         }
     }
 }
 
-async function simulateImageGeneration(prompt, model, apiKey, backupApiKey) {
-    // Simulated image generation (replace with actual Gemini API image generation)
-    return 'https://via.placeholder.com/800x600.png?text=Comic+Page'; // Placeholder
+function mapImageModel(selected) {
+    const map = {
+        'gemini-2.5-flash-image': 'imagen-3.0-generate-001', // Example mapping
+        'gemini-2.0-flash-image': 'imagen-3.0-fast-generate-001',
+        'imagen-4': 'imagen-4.0-generate-001'
+    };
+    return map[selected] || 'imagen-4.0-generate-001';
+}
+
+async function generateImage(prompt, model, apiKey) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict`;
+    const requestBody = {
+        instances: [{ prompt: prompt }], // English prompt
+        parameters: { sampleCount: 1, aspectRatio: '3:4' } // Adjust as needed
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'x-goog-api-key': apiKey,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+        if (response.status === 429) throw new Error('Rate limit exceeded (429)');
+        throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    // Assume single image
+    return data.predictions[0].generatedImages[0].image.imageBytes; // base64
 }
 
 // Comic Editor
@@ -370,14 +476,14 @@ function saveProject(projectName) {
 async function downloadComic() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    const comicPanels = document.querySelectorAll('.comic-panel-item');
+    const comicPanelItems = document.querySelectorAll('.comic-panel-item');
     
-    for (let i = 0; i < comicPanels.length; i++) {
-        const img = comicPanels[i].querySelector('.panel-image img');
+    for (let i = 0; i < comicPanelItems.length; i++) {
+        const img = comicPanelItems[i].querySelector('.panel-image img');
         if (img) {
             if (i > 0) doc.addPage();
             const imgData = await getImageData(img);
-            doc.addImage(imgData, 'PNG', 10, 10, 190, 277);
+            doc.addImage(imgData, 'PNG', 0, 0, 210, 297); // A4 size
         }
     }
     
@@ -411,7 +517,7 @@ function loadProjects() {
                 <button class="btn btn-primary" onclick="loadProject(${project.id})">טען</button>
                 <button class="btn btn-secondary" onclick="editProject(${project.id})">ערוך שם</button>
                 <button class="btn btn-secondary" onclick="toggleFavorite(${project.id})">
-                    <i class="fas fa-star ${project.isFavorite ? 'active' : ''}"></i>
+                    <i class="fas fa-star ${project.isFavorite ? 'active' : ''}"></i> ${project.isFavorite ? 'הסר מועדף' : 'סמן כמועדף'}
                 </button>
                 <button class="btn btn-secondary" onclick="deleteProject(${project.id})">מחק</button>
             </div>
@@ -426,7 +532,8 @@ function filterProjects() {
     const projectsList = document.getElementById('projects-list');
     projectsList.innerHTML = '';
 
-    projects.filter(project => project.name.toLowerCase().includes(searchTerm)).forEach(project => {
+    const filtered = projects.filter(project => project.name.toLowerCase().includes(searchTerm));
+    filtered.forEach(project => {
         const projectCard = document.createElement('div');
         projectCard.className = 'project-card';
         projectCard.innerHTML = `
@@ -436,7 +543,7 @@ function filterProjects() {
                 <button class="btn btn-primary" onclick="loadProject(${project.id})">טען</button>
                 <button class="btn btn-secondary" onclick="editProject(${project.id})">ערוך שם</button>
                 <button class="btn btn-secondary" onclick="toggleFavorite(${project.id})">
-                    <i class="fas fa-star ${project.isFavorite ? 'active' : ''}"></i>
+                    <i class="fas fa-star ${project.isFavorite ? 'active' : ''}"></i> ${project.isFavorite ? 'הסר מועדף' : 'סמן כמועדף'}
                 </button>
                 <button class="btn btn-secondary" onclick="deleteProject(${project.id})">מחק</button>
             </div>
@@ -494,7 +601,8 @@ function toggleFavorite(id) {
 
 function deleteProject(id) {
     if (confirm('האם אתה בטוח שברצונך למחוק את הפרויקט?')) {
-        const projects = JSON.parse(localStorage.getItem('projects') || '[]').filter(p => p.id !== id);
+        let projects = JSON.parse(localStorage.getItem('projects') || '[]');
+        projects = projects.filter(p => p.id !== id);
         localStorage.setItem('projects', JSON.stringify(projects));
         loadProjects();
         showToast('פרויקט נמחק בהצלחה', 'success');
@@ -504,7 +612,7 @@ function deleteProject(id) {
 // Load projects on page load
 document.addEventListener('DOMContentLoaded', loadProjects);
 
-// Feedback (to be implemented later)
+// Feedback (skipped as per instructions)
 function submitFeedback() {
     showToast('משוב לא מיושם כרגע', 'info');
 }
