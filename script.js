@@ -4,12 +4,18 @@ const AppState = {
   apiKey: localStorage.getItem("gemini_api_key") || "",
   backupApiKey: "",
   storyModel: localStorage.getItem("story_model") || "gemini-2.5-flash",
-  imageModel: "gemini-2.5-flash-image-preview",
+  imageModel: localStorage.getItem("image_model") || "gemini-2.5-flash-image", // החלפה למודל הלא-Preview
   currentSection: "home",
   currentProject: null,
   projects: [],
   selectedRating: 0,
   isGenerating: false,
+}
+
+// בדיקה והחלפה של המודל אם הוא Preview
+if (AppState.imageModel === "gemini-2.5-flash-image-preview") {
+  AppState.imageModel = "gemini-2.5-flash-image";
+  localStorage.setItem("image_model", AppState.imageModel);
 }
 
 // Initialize App
@@ -395,7 +401,11 @@ function getStyleDescription(artStyle) {
 }
 
 async function checkImageGenerationQuota(numberOfPages) {
-  // This is a simplified check - in production, you'd want to call the actual quota API
+  // הצג אזהרה אם מספר העמודים גדול מ-10
+  if (numberOfPages > 10) {
+    showToast("warning", "מספר עמודים גדול – זה עלול לנצל את המכסה היומית!");
+  }
+  // בדיקה פשוטה של זמינות המודל
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash?key=${AppState.apiKey}`,
@@ -406,7 +416,7 @@ async function checkImageGenerationQuota(numberOfPages) {
     return { canGenerate: false }
   } catch (error) {
     console.error("[v0] Error checking quota:", error)
-    return { canGenerate: true } // Allow generation even if check fails
+    return { canGenerate: true } // התרשה המשך גם אם הבדיקה נכשלה
   }
 }
 
@@ -429,7 +439,7 @@ async function generateComicPages(storyStructure, artStyle, progressElement) {
     const page = storyStructure.pages[i]
 
     try {
-      // Generate image for entire page - NO RETRY
+      // יצירת תמונה לעמוד שלם
       const imageUrl = await generatePageImage(page, artStyle, storyStructure.title)
 
       pages.push({
@@ -443,7 +453,7 @@ async function generateComicPages(storyStructure, artStyle, progressElement) {
     } catch (error) {
       console.error(`[v0] Error generating page ${i + 1}:`, error)
 
-      // Try backup key if available, but NO RETRY
+      // נסה מפתח גיבוי אם קיים
       if (AppState.backupApiKey) {
         try {
           const imageUrl = await generatePageImage(page, artStyle, storyStructure.title, true)
@@ -476,6 +486,8 @@ async function generateComicPages(storyStructure, artStyle, progressElement) {
         updateProgress(progressElement, Math.round(currentProgress))
       }
     }
+    // הוספת עיכוב של 2 שניות בין בקשות כדי למנוע חריגה ממגבלת RPM
+    await sleep(2000);
   }
 
   return pages
@@ -484,7 +496,7 @@ async function generateComicPages(storyStructure, artStyle, progressElement) {
 async function generatePageImage(page, artStyle, title, useBackupKey = false) {
   const apiKey = useBackupKey ? AppState.backupApiKey : AppState.apiKey
 
-  // Create detailed prompt for the entire page
+  // יצירת פרומפט מפורט לעמוד שלם
   let pagePrompt = `Create a complete comic book page in ${getStyleDescription(artStyle)} style.\n`
   pagePrompt += `Title: ${title}\n`
   pagePrompt += `Page ${page.pageNumber} contains ${page.panels.length} panels:\n\n`
@@ -501,144 +513,153 @@ async function generatePageImage(page, artStyle, title, useBackupKey = false) {
     pagePrompt += `\n`
   })
 
-  pagePrompt += `\nIMPORTANT: All text must be in Hebrew! Create a professional comic book page layout with clear speech bubbles and text boxes. Comic book style with clear borders between panels.`
+  pagePrompt += `\nIMPORTANT: All text must be in Hebrew! Create a professional comic book page layout with clear speech bubbles and narration boxes.`
 
-  return await generateImageWithGemini(pagePrompt, apiKey)
+  return await generateImageWithGemini(pagePrompt, useBackupKey)
 }
 
-async function generateImageWithGemini(prompt, apiKey) {
-  const model = "gemini-2.5-flash-image-preview"
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
-
+async function generateImageWithGemini(pagePrompt, useBackup = false) {
   console.log("[v0] Calling Gemini 2.5 Flash Image API")
+  const apiKey = useBackup ? AppState.backupApiKey : AppState.apiKey
+  let retryCount = 0;
+  const maxRetries = 3; // מספר ניסיונות חוזרים מקסימלי
 
-  const requestBody = {
-    contents: [
-      {
-        parts: [
-          {
-            text: prompt,
-          },
-        ],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.7,
-      topK: 40,
-      topP: 0.95,
-    },
-  }
-
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error("[v0] Gemini API error:", errorText)
-    throw new Error(`Gemini API שגיאה ${response.status}: ${errorText}`)
-  }
-
-  const data = await response.json()
-  console.log("[v0] Gemini response:", data)
-
-  // Extract image from response
-  if (data.candidates && data.candidates.length > 0) {
-    const candidate = data.candidates[0]
-
-    // Check for inline data (base64 image)
-    if (candidate.content && candidate.content.parts) {
-      for (const part of candidate.content.parts) {
-        if (part.inlineData && part.inlineData.data) {
-          const mimeType = part.inlineData.mimeType || "image/png"
-          return `data:${mimeType};base64,${part.inlineData.data}`
+  while (retryCount < maxRetries) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${AppState.imageModel}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: pagePrompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.8,
+              topK: 40,
+              topP: 0.95,
+              responseMimeType: "image/png",
+            },
+          }),
         }
+      );
+
+      if (response.status === 429) {
+        const errorData = await response.json();
+        const retryDelay = errorData.error?.details?.find(d => d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo')?.retryDelay || '55s';
+        const delayMs = parseRetryDelay(retryDelay) * 1000; // המר לשניות
+        console.log(`[v0] Rate limit hit, retrying after ${retryDelay}`);
+        await sleep(delayMs);
+        retryCount++;
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini API שגיאה ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      if (!data.candidates || !data.candidates[0].content.parts[0].inlineData) {
+        throw new Error("No image data in response");
+      }
+
+      const imageData = data.candidates[0].content.parts[0].inlineData.data;
+      return `data:image/png;base64,${imageData}`;
+    } catch (error) {
+      console.error("[v0] Gemini API error:", error);
+      if (retryCount < maxRetries - 1) {
+        await sleep(5000); // עיכוב קצר בין ניסיונות
+        retryCount++;
+      } else {
+        throw error;
       }
     }
   }
-
-  throw new Error("לא התקבלה תמונה מ-Gemini API. ייתכן שהמודל עדיין לא זמין או שיש בעיה במפתח.")
+  throw new Error("Exceeded max retries");
 }
 
-// Comic Editor Functions
+// פונקציה עזר להמרת retryDelay (למשל "55s" ל-55)
+function parseRetryDelay(delayStr) {
+  return parseFloat(delayStr.replace('s', '')) || 55;
+}
+
 function displayComicInEditor(pages) {
   const comicPanels = document.getElementById("comic-panels")
   comicPanels.innerHTML = ""
 
   pages.forEach((page, index) => {
-    const pageElement = createPageElement(page, index)
-    comicPanels.appendChild(pageElement)
-  })
-}
+    const pageDiv = document.createElement("div")
+    pageDiv.className = "comic-panel-item"
+    pageDiv.dataset.index = index
 
-function createPageElement(page, index) {
-  const pageDiv = document.createElement("div")
-  pageDiv.className = "comic-panel-item"
-  pageDiv.dataset.pageIndex = index
-
-  const header = document.createElement("div")
-  header.className = "panel-header"
-  header.innerHTML = `
-    <span class="panel-number">עמוד ${page.pageNumber}</span>
-    <div class="panel-controls">
-      <button class="panel-btn" onclick="deletePanel(${index})" title="מחק">
-        <i class="fas fa-trash"></i>
-      </button>
-    </div>
-  `
-
-  const content = document.createElement("div")
-  content.className = "panel-content"
-
-  if (page.imageUrl) {
-    const img = document.createElement("img")
-    img.src = page.imageUrl
-    img.alt = `עמוד ${page.pageNumber}`
-    img.className = "panel-generated-image"
-    img.loading = "eager" // Force immediate loading, not lazy loading
-    img.style.width = "100%"
-    img.style.height = "auto"
-    img.style.borderRadius = "8px"
-    content.appendChild(img)
-  } else if (page.error) {
-    const errorDiv = document.createElement("div")
-    errorDiv.className = "panel-image"
-    errorDiv.style.background = "#fff3cd"
-    errorDiv.style.color = "#856404"
-    errorDiv.style.padding = "20px"
-    errorDiv.style.textAlign = "center"
-    errorDiv.innerHTML = `
-      <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px;"></i><br>
-      <strong>שגיאה ביצירת התמונה</strong><br>
-      <small style="font-size: 0.8rem;">${page.error}</small>
+    const header = document.createElement("div")
+    header.className = "panel-header"
+    header.innerHTML = `
+      <span class="panel-number">עמוד ${page.pageNumber}</span>
+      <div class="panel-controls">
+        <button class="panel-btn" onclick="deletePanel(${index})" title="מחק">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
     `
-    content.appendChild(errorDiv)
-  } else {
-    content.innerHTML = '<div class="panel-image">טוען תמונה...</div>'
-  }
 
-  // Display panel text information
-  const textDiv = document.createElement("div")
-  textDiv.style.marginTop = "10px"
-  page.panels.forEach((panel, pIndex) => {
-    const panelText = document.createElement("div")
-    panelText.className = "panel-text-item"
-    let textContent = `<strong>פאנל ${pIndex + 1}:</strong><br>`
-    if (panel.dialogue) textContent += `💬 ${panel.dialogue}<br>`
-    if (panel.narration) textContent += `📝 ${panel.narration}`
-    panelText.innerHTML = textContent
-    textDiv.appendChild(panelText)
+    const content = document.createElement("div")
+    content.className = "panel-content"
+
+    if (page.imageUrl) {
+      const img = document.createElement("img")
+      img.src = page.imageUrl
+      img.alt = `עמוד ${page.pageNumber}`
+      img.className = "panel-generated-image"
+      img.loading = "eager" // Force immediate loading, not lazy loading
+      img.style.width = "100%"
+      img.style.height = "auto"
+      img.style.borderRadius = "8px"
+      content.appendChild(img)
+    } else if (page.error) {
+      const errorDiv = document.createElement("div")
+      errorDiv.className = "panel-image"
+      errorDiv.style.background = "#fff3cd"
+      errorDiv.style.color = "#856404"
+      errorDiv.style.padding = "20px"
+      errorDiv.style.textAlign = "center"
+      errorDiv.innerHTML = `
+        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px;"></i><br>
+        <strong>שגיאה ביצירת התמונה</strong><br>
+        <small style="font-size: 0.8rem;">${page.error}</small>
+      `
+      content.appendChild(errorDiv)
+    } else {
+      content.innerHTML = '<div class="panel-image">טוען תמונה...</div>'
+    }
+
+    // Display panel text information
+    const textDiv = document.createElement("div")
+    textDiv.style.marginTop = "10px"
+    page.panels.forEach((panel, pIndex) => {
+      const panelText = document.createElement("div")
+      panelText.className = "panel-text-item"
+      let textContent = `<strong>פאנל ${pIndex + 1}:</strong><br>`
+      if (panel.dialogue) textContent += `💬 ${panel.dialogue}<br>`
+      if (panel.narration) textContent += `📝 ${panel.narration}`
+      panelText.innerHTML = textContent
+      textDiv.appendChild(panelText)
+    })
+    content.appendChild(textDiv)
+
+    pageDiv.appendChild(header)
+    pageDiv.appendChild(content)
+
+    comicPanels.appendChild(pageDiv)
   })
-  content.appendChild(textDiv)
-
-  pageDiv.appendChild(header)
-  pageDiv.appendChild(content)
-
-  return pageDiv
 }
 
 function addPanel() {
