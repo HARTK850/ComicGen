@@ -248,7 +248,7 @@ async function generateComic(input, artStyle, isAIGenerated) {
     if (!quotaCheck.canGenerate) {
       const backupKey = await promptForBackupApiKey()
       if (!backupKey) {
-        throw new Error("לא ניתן להמשיך ללא מפתח API נוסף")
+        throw new Error("לא ניתן להמשיך بدون מפתח API נוסף")
       }
       AppState.backupApiKey = backupKey
     }
@@ -371,8 +371,8 @@ function getStyleDescription(artStyle) {
     anime: "אנימה יפנית - עיניים גדולות, צבעים חיים, קווים נקיים",
     realistic: "ריאליסטי - פרטים מדויקים, תאורה טבעית, פרופורציות אמיתיות",
     cartoon: "קריקטורה - מוגזם, צבעוני, משעשע",
-    comic: "קומיקס קלאסי - קווי מתאר מודגשים, צללים דרמטיים, בועות דיבור",
-    manga: "מנגה - שחור לבן, קווי מהירות, ביטויים דרמטיים",
+    comic: "קומיקס קלאסי - קווים מתאר מודגשים, צללים דרמטיים, בועות דיבור",
+    manga: "מנגה - שחור לבן, קווים מהירות, ביטויים דרמטיים",
   }
   return styles[artStyle] || styles["comic"]
 }
@@ -405,7 +405,7 @@ async function promptForBackupApiKey() {
 async function generateComicPages(storyStructure, artStyle, progressElement) {
   const pages = []
   const totalPages = storyStructure.pages.length
-  const progressPerPage = 75 / totalPages // 20% to 95%
+  const progressPerPage = 75 / totalPages
   let currentProgress = 20
 
   for (let i = 0; i < storyStructure.pages.length; i++) {
@@ -426,7 +426,6 @@ async function generateComicPages(storyStructure, artStyle, progressElement) {
     } catch (error) {
       console.error(`[v0] Error generating page ${i + 1}:`, error)
 
-      // Try with backup API key if available
       if (AppState.backupApiKey) {
         try {
           const imageUrl = await generatePageImage(page, artStyle, storyStructure.title, true)
@@ -464,147 +463,104 @@ async function generatePageImage(page, artStyle, title, useBackupKey = false) {
   const apiKey = useBackupKey ? AppState.backupApiKey : AppState.apiKey
 
   // Create detailed prompt for the entire page
-  let pagePrompt = `צור עמוד קומיקס שלם בסגנון ${getStyleDescription(artStyle)}.\n`
-  pagePrompt += `כותרת: ${title}\n`
-  pagePrompt += `עמוד ${page.pageNumber} מכיל ${page.panels.length} פאנלים:\n\n`
+  let pagePrompt = `Create a complete comic book page in ${getStyleDescription(artStyle)} style.\n`
+  pagePrompt += `Title: ${title}\n`
+  pagePrompt += `Page ${page.pageNumber} contains ${page.panels.length} panels:\n\n`
 
   page.panels.forEach((panel, index) => {
-    pagePrompt += `פאנל ${index + 1}:\n`
-    pagePrompt += `תיאור: ${panel.visualDescription}\n`
+    pagePrompt += `Panel ${index + 1}:\n`
+    pagePrompt += `Scene: ${panel.visualDescription}\n`
     if (panel.dialogue) {
-      pagePrompt += `דיאלוג (בבועת דיבור בעברית): ${panel.dialogue}\n`
+      pagePrompt += `Dialogue (in Hebrew speech bubble): ${panel.dialogue}\n`
     }
     if (panel.narration) {
-      pagePrompt += `נרציה (בתיבת טקסט בעברית): ${panel.narration}\n`
+      pagePrompt += `Narration (in Hebrew text box): ${panel.narration}\n`
     }
     pagePrompt += `\n`
   })
 
-  pagePrompt += `\nחשוב: כל הטקסטים חייבים להיות בעברית! צור פריסת פאנלים מקצועית עם בועות דיבור ותיבות טקסט ברורות.`
+  pagePrompt += `\nIMPORTANT: All text must be in Hebrew! Create a professional panel layout with clear speech bubbles and text boxes. Comic book style with clear borders between panels.`
 
-  // Check which image model is being used
-  if (AppState.imageModel.includes("imagen")) {
-    // Use Imagen 4 API
-    return await generateWithImagen(pagePrompt, apiKey)
-  } else {
-    // Use Gemini image generation
-    return await generateWithGemini(pagePrompt, apiKey)
-  }
+  return await generateWithImagenRetry(pagePrompt, apiKey)
 }
 
-async function generateWithImagen(prompt, apiKey) {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/imagen-4:generateImages?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt: prompt,
-        number_of_images: 1,
-        aspect_ratio: "3:4", // Comic book page ratio
-        safety_filter_level: "block_some",
-        person_generation: "allow_all",
-      }),
-    },
-  )
+async function generateWithImagenRetry(prompt, apiKey, maxRetries = 3) {
+  let lastError = null
 
-  if (!response.ok) {
-    throw new Error(`Imagen API error: ${response.status}`)
-  }
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const waitTime = Math.pow(2, attempt) * 1000 // 2s, 4s, 8s
+        console.log(`[v0] Retry attempt ${attempt + 1} after ${waitTime}ms`)
+        await sleep(waitTime)
+      }
 
-  const data = await response.json()
-
-  if (data.generatedImages && data.generatedImages.length > 0) {
-    // Return the base64 image data
-    return `data:image/png;base64,${data.generatedImages[0].image.imageBytes}`
-  }
-
-  throw new Error("No image generated")
-}
-
-async function generateWithGemini(prompt, apiKey) {
-  // Gemini models with image generation capability
-  const model = AppState.imageModel
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            instances: [
               {
-                text: prompt,
+                prompt: prompt,
               },
             ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.9,
-          topK: 40,
-          topP: 0.95,
+            parameters: {
+              sampleCount: 1,
+              aspectRatio: "3:4",
+              safetyFilterLevel: "block_some",
+              personGeneration: "allow_all",
+            },
+          }),
         },
-      }),
-    },
-  )
+      )
 
-  if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status}`)
-  }
+      if (response.status === 429) {
+        lastError = new Error("Too many requests - rate limit exceeded")
+        console.log(`[v0] Rate limit hit, attempt ${attempt + 1}/${maxRetries}`)
+        continue // Retry
+      }
 
-  const data = await response.json()
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Imagen API error ${response.status}: ${errorText}`)
+      }
 
-  // For Gemini image models, check if there's inline data
-  if (data.candidates && data.candidates[0].content.parts) {
-    for (const part of data.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
+      const data = await response.json()
+
+      if (data.predictions && data.predictions.length > 0) {
+        const prediction = data.predictions[0]
+        if (prediction.bytesBase64Encoded) {
+          return `data:image/png;base64,${prediction.bytesBase64Encoded}`
+        }
+        if (prediction.mimeType && prediction.bytesBase64Encoded) {
+          return `data:${prediction.mimeType};base64,${prediction.bytesBase64Encoded}`
+        }
+      }
+
+      throw new Error("No image data in response")
+    } catch (error) {
+      lastError = error
+      console.error(`[v0] Attempt ${attempt + 1} failed:`, error.message)
+
+      if (error.message.includes("429") || error.message.includes("rate limit")) {
+        continue
+      }
+
+      if (attempt < maxRetries - 1) {
+        continue
       }
     }
   }
 
-  throw new Error("No image generated by Gemini")
+  throw lastError || new Error("Failed to generate image after all retries")
 }
 
-async function callGeminiAPI(model, prompt) {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${AppState.apiKey}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-        },
-      }),
-    },
-  )
-
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`)
-  }
-
-  const data = await response.json()
-  return data.candidates[0].content.parts[0].text
+async function generateWithImagen(prompt, apiKey) {
+  return await generateWithImagenRetry(prompt, apiKey)
 }
 
 // Comic Editor Functions
@@ -737,6 +693,11 @@ function loadProjects() {
 
   if (!projectsList) return
 
+  if (!Array.isArray(AppState.projects)) {
+    AppState.projects = []
+    localStorage.setItem("projects", "[]")
+  }
+
   if (AppState.projects.length === 0) {
     projectsList.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">אין פרויקטים שמורים</p>'
     return
@@ -745,20 +706,31 @@ function loadProjects() {
   projectsList.innerHTML = ""
 
   AppState.projects.forEach((project, index) => {
-    const projectCard = createProjectCard(project, index)
-    projectsList.appendChild(projectCard)
+    try {
+      if (project && project.pages && Array.isArray(project.pages)) {
+        const projectCard = createProjectCard(project, index)
+        projectsList.appendChild(projectCard)
+      }
+    } catch (error) {
+      console.error(`[v0] Error creating project card ${index}:`, error)
+    }
   })
 }
 
 function createProjectCard(project, index) {
+  if (!project || !project.pages) {
+    console.error("[v0] Invalid project data:", project)
+    return document.createElement("div")
+  }
+
   const card = document.createElement("div")
   card.className = "project-card"
-  card.dataset.projectName = project.name.toLowerCase()
+  card.dataset.projectName = (project.name || "").toLowerCase()
 
   const date = new Date(project.createdAt).toLocaleDateString("he-IL")
 
   card.innerHTML = `
-    <h3>${project.name}</h3>
+    <h3>${project.name || "ללא שם"}</h3>
     <p>נוצר ב: ${date}</p>
     <p>עמודים: ${project.pages.length}</p>
     <div class="project-actions">
@@ -1036,4 +1008,50 @@ window.onclick = (event) => {
   if (event.target === editModal) {
     closeEditProjectModal()
   }
+}
+
+// Utility function for delays
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function callGeminiAPI(model, prompt) {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${AppState.apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+        },
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`API error ${response.status}: ${errorText}`)
+  }
+
+  const data = await response.json()
+
+  if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+    throw new Error("Invalid response from Gemini API")
+  }
+
+  return data.candidates[0].content.parts[0].text
 }
