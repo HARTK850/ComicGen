@@ -114,9 +114,6 @@ body {
   color: white;
 }
 
-/* הסרת סגנונות קשורים למשתמש אם היו */
-/* .nav-user, .user-btn, .user-menu - הוסרו מה-HTML ולכן אין צורך בסגנונות אלו יותר */
-
 /* Main Content */
 .main-content {
   max-width: 1200px;
@@ -184,31 +181,28 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  /* ensure the image fills the space */
-  padding: 20px; /* Add some padding around the image */
+  padding: 20px;
 }
 
 .comic-preview {
-  width: 300px; /* Adjust as needed */
-  height: 200px; /* Adjust as needed */
-  background: white; /* Changed from gradient to white */
+  width: 300px;
+  height: 200px;
+  background: white;
   border-radius: 15px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
   display: flex;
   justify-content: center;
   align-items: center;
   position: relative;
-  overflow: hidden; /* Ensure image stays within bounds */
+  overflow: hidden;
 }
 
 .comic-preview img.full-size-image {
   width: 100%;
   height: 100%;
-  object-fit: contain; /* This will fit the entire image without cropping */
-  border-radius: 15px; /* Apply border-radius to the image itself */
+  object-fit: contain;
+  border-radius: 15px;
 }
-
-/* .comic-panel, .speech-bubble - הוסרו מה-HTML ולכן אין צורך בסגנונות אלו יותר */
 
 /* Features Section */
 .features {
@@ -329,10 +323,10 @@ body {
   color: #667eea;
 }
 
-/* API Setup */
+/* Updated API setup card layout for side-by-side display */
 .api-setup-card {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1.5fr 1fr;
   gap: 30px;
   align-items: start;
 }
@@ -347,7 +341,36 @@ body {
   padding: 20px;
   border-radius: 10px;
   position: sticky;
-  top: 20px;
+  top: 90px;
+}
+
+.api-help p {
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+
+.api-help strong {
+  color: #667eea;
+}
+
+.api-help ol {
+  padding-right: 20px;
+  margin-top: 10px;
+}
+
+.api-help li {
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+
+.api-help a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.api-help a:hover {
+  text-decoration: underline;
 }
 
 .form-group {
@@ -366,9 +389,9 @@ body {
   display: flex;
 }
 
+/* Fixed cursor for input fields to show text cursor */
 .form-group input,
-.form-group textarea,
-.form-group select {
+.form-group textarea {
   width: 100%;
   padding: 12px 15px;
   border: 2px solid #e0e0e0;
@@ -378,16 +401,24 @@ body {
   transition: all 0.3s ease;
   background: white;
   cursor: text;
+}
+
+.form-group select {
+  width: 100%;
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: white;
+  cursor: pointer;
   appearance: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667eea' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
   background-repeat: no-repeat;
   background-position: left 10px center;
   background-size: 20px;
   padding-left: 40px;
-}
-
-.form-group select {
-  cursor: pointer;
 }
 
 .form-group input:focus,
@@ -440,35 +471,6 @@ body {
   border: 1px solid #f5c6cb;
 }
 
-.api-help {
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 10px;
-}
-
-.api-help h3 {
-  margin-bottom: 15px;
-  color: #333;
-}
-
-.api-help ol {
-  padding-right: 20px;
-}
-
-.api-help li {
-  margin-bottom: 8px;
-  line-height: 1.6;
-}
-
-.api-help a {
-  color: #667eea;
-  text-decoration: none;
-}
-
-.api-help a:hover {
-  text-decoration: underline;
-}
-
 /* Story Editor */
 .story-editor-container {
   max-width: 800px;
@@ -503,6 +505,7 @@ body {
   margin-bottom: 20px;
 }
 
+/* Hidden story output by default */
 .story-output {
   margin-top: 30px;
   padding: 20px;
@@ -510,7 +513,7 @@ body {
   border-radius: 10px;
   border: 2px dashed #dee2e6;
   min-height: 200px;
-  display: none; /* Hidden by default */
+  display: none;
 }
 
 .story-output.active {
@@ -577,7 +580,7 @@ body {
   padding: 20px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
   position: relative;
-  cursor: grab; /* Changed to grab for drag-and-drop indication */
+  cursor: grab;
   transition: all 0.3s ease;
 }
 
@@ -663,13 +666,13 @@ body {
   color: #666;
   font-style: italic;
   margin-top: 10px;
-  overflow: hidden; /* Ensure image fits */
+  overflow: hidden;
 }
 
 .panel-image img {
   width: 100%;
   height: 100%;
-  object-fit: contain; /* Adjust to 'cover' or 'contain' as per preference */
+  object-fit: contain;
   border-radius: 8px;
 }
 
@@ -680,6 +683,7 @@ body {
   border-radius: 5px;
   font-size: 0.9rem;
   margin-top: 10px;
+  cursor: text;
 }
 
 /* Projects Section Styles */
@@ -703,6 +707,7 @@ body {
   font-family: inherit;
   font-size: 1rem;
   transition: all 0.3s ease;
+  cursor: text;
 }
 
 .projects-toolbar input:focus {
@@ -955,6 +960,74 @@ body {
   }
 }
 
+/* Settings Section */
+.settings-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-section {
+  background: white;
+  padding: 25px;
+  border-radius: 15px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  margin-bottom: 25px;
+}
+
+.settings-section h3 {
+  font-size: 1.3rem;
+  color: #333;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-section .api-form {
+  margin-top: 15px;
+}
+
+.settings-section .api-help {
+  margin-top: 15px;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.settings-section .api-help p {
+  margin-bottom: 10px;
+}
+
+.panel-generated-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Added spinner animation for loading button */
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.btn-loading::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 50%;
+  left: 50%;
+  margin-left: -8px;
+  margin-top: -8px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 0.6s linear infinite;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .nav-container {
@@ -989,7 +1062,7 @@ body {
   }
 
   .hero-subtitle {
-    font-size: 1.2rem; /* Adjusted for better readability on smaller screens */
+    font-size: 1.2rem;
   }
 
   .hero-buttons {
@@ -1014,8 +1087,13 @@ body {
     margin: 10px;
   }
 
+  /* Responsive layout for API setup card */
   .api-setup-card {
     grid-template-columns: 1fr;
+  }
+
+  .api-help {
+    position: static;
   }
 
   .story-controls {
@@ -1044,7 +1122,6 @@ body {
     width: 95%;
   }
 
-  /* Projects specific responsive adjustments */
   .projects-toolbar input {
     max-width: 100%;
   }
@@ -1073,83 +1150,11 @@ body {
   }
 
   .hero-image {
-    padding: 0; /* Remove padding for very small screens if needed */
+    padding: 0;
   }
 
   .comic-preview {
-    width: 100%; /* Make preview full width on small screens */
-    height: 180px; /* Adjust height for small screens */
+    width: 100%;
+    height: 180px;
   }
-}
-
-/* Settings Section */
-.settings-container {
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.settings-section {
-  background: white;
-  padding: 25px;
-  border-radius: 15px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-  margin-bottom: 25px;
-}
-
-.settings-section h3 {
-  font-size: 1.3rem;
-  color: #333;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.settings-section h3::before {
-  content: "⚙️";
-  font-size: 1.5rem;
-}
-
-.settings-section .api-form {
-  margin-top: 15px;
-}
-
-.settings-section .api-help {
-  margin-top: 15px;
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 8px;
-}
-
-.settings-section .api-help p {
-  margin-bottom: 10px;
-}
-
-.panel-generated-image {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  display: block;
-  margin: 0 auto;
-}
-
-.btn-loading {
-  position: relative;
-  pointer-events: none;
-  opacity: 0.7;
-}
-
-.btn-loading::after {
-  content: "";
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  top: 50%;
-  left: 50%;
-  margin-left: -8px;
-  margin-top: -8px;
-  border: 2px solid #ffffff;
-  border-radius: 50%;
-  border-top-color: transparent;
-  animation: spin 0.6s linear infinite;
 }
