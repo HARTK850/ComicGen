@@ -332,8 +332,22 @@ body {
 /* API Setup */
 .api-setup-card {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 40px;
+  grid-template-columns: 2fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+.api-form {
+  order: 1;
+}
+
+.api-help {
+  order: 2;
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 10px;
+  position: sticky;
+  top: 20px;
 }
 
 .form-group {
@@ -363,13 +377,17 @@ body {
   font-size: 1rem;
   transition: all 0.3s ease;
   background: white;
-  cursor: pointer;
+  cursor: text;
   appearance: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667eea' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
   background-repeat: no-repeat;
   background-position: left 10px center;
   background-size: 20px;
   padding-left: 40px;
+}
+
+.form-group select {
+  cursor: pointer;
 }
 
 .form-group input:focus,
@@ -492,6 +510,11 @@ body {
   border-radius: 10px;
   border: 2px dashed #dee2e6;
   min-height: 200px;
+  display: none; /* Hidden by default */
+}
+
+.story-output.active {
+  display: block;
 }
 
 .story-output-page {
@@ -1108,4 +1131,25 @@ body {
   object-fit: contain;
   display: block;
   margin: 0 auto;
+}
+
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.btn-loading::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 50%;
+  left: 50%;
+  margin-left: -8px;
+  margin-top: -8px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 0.6s linear infinite;
 }
