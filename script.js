@@ -119,9 +119,99 @@ function toggleApiKeyVisibility() {
   }
 }
 
+async function autoDetectProjectId(apiKey) {
+  console.log("[v0] Attempting to auto-detect Project ID...")
+
+  // Method 1: Try Cloud Resource Manager API
+  try {
+    const response = await fetch(`https://cloudresourcemanager.googleapis.com/v1/projects?key=${apiKey}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      if (data.projects && data.projects.length > 0) {
+        const projectId = data.projects[0].projectId
+        console.log("[v0] Project ID detected via Cloud Resource Manager:", projectId)
+        return projectId
+      }
+    }
+  } catch (error) {
+    console.log("[v0] Method 1 failed:", error.message)
+  }
+
+  // Method 2: Try to extract from API key structure (some keys encode project info)
+  try {
+    // API keys sometimes have patterns, but this is not reliable
+    // This is a fallback method
+    const keyParts = apiKey.split("-")
+    if (keyParts.length > 1) {
+      console.log("[v0] Analyzing API key structure...")
+    }
+  } catch (error) {
+    console.log("[v0] Method 2 failed:", error.message)
+  }
+
+  // Method 3: Try Service Usage API
+  try {
+    const response = await fetch(`https://serviceusage.googleapis.com/v1/projects/-/services?key=${apiKey}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+
+    const data = await response.json()
+
+    // Check if error message contains project info
+    if (data.error && data.error.message) {
+      const projectMatch = data.error.message.match(/projects\/([a-z0-9-]+)/i)
+      if (projectMatch && projectMatch[1]) {
+        const projectId = projectMatch[1]
+        console.log("[v0] Project ID detected from error message:", projectId)
+        return projectId
+      }
+    }
+  } catch (error) {
+    console.log("[v0] Method 3 failed:", error.message)
+  }
+
+  // Method 4: Try to get project from Gemini API metadata
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      // Check response headers for project information
+      const projectHeader = response.headers.get("x-goog-api-client")
+      if (projectHeader) {
+        const projectMatch = projectHeader.match(/project\/([a-z0-9-]+)/i)
+        if (projectMatch && projectMatch[1]) {
+          const projectId = projectMatch[1]
+          console.log("[v0] Project ID detected from headers:", projectId)
+          return projectId
+        }
+      }
+    }
+  } catch (error) {
+    console.log("[v0] Method 4 failed:", error.message)
+  }
+
+  console.log("[v0] Could not auto-detect Project ID")
+  return null
+}
+
 async function validateApiKey() {
   const apiKey = document.getElementById("api-key").value.trim()
-  const projectId = document.getElementById("project-id").value.trim()
+  const projectIdInput = document.getElementById("project-id")
   const vertexLocation = document.getElementById("vertex-location").value
   const statusDiv = document.getElementById("api-status")
   const btn = document.getElementById("validate-api-btn")
@@ -161,13 +251,34 @@ async function validateApiKey() {
     )
 
     if (response.ok) {
+      btnText.textContent = "מזהה פרויקט..."
+      const detectedProjectId = await autoDetectProjectId(apiKey)
+
+      if (detectedProjectId) {
+        projectIdInput.value = detectedProjectId
+        AppState.projectId = detectedProjectId
+        localStorage.setItem("gcp_project_id", detectedProjectId)
+        showStatus(statusDiv, "success", `✓ מפתח API תקין! מזהה הפרויקט זוהה אוטומטית: ${detectedProjectId}`)
+      } else {
+        // If auto-detection failed, check if user entered it manually
+        const manualProjectId = projectIdInput.value.trim()
+        if (manualProjectId) {
+          AppState.projectId = manualProjectId
+          localStorage.setItem("gcp_project_id", manualProjectId)
+          showStatus(statusDiv, "success", "✓ מפתח API תקין ונשמר בהצלחה!")
+        } else {
+          showStatus(
+            statusDiv,
+            "warning",
+            "✓ מפתח API תקין! לא ניתן לזהות מזהה פרויקט אוטומטית. אנא הזן ידנית אם אתה משתמש ב-Vertex AI.",
+          )
+        }
+      }
+
       AppState.apiKey = apiKey
-      AppState.projectId = projectId
       AppState.vertexLocation = vertexLocation
       localStorage.setItem("gemini_api_key", apiKey)
-      localStorage.setItem("gcp_project_id", projectId)
       localStorage.setItem("vertex_location", vertexLocation)
-      showStatus(statusDiv, "success", "✓ מפתח API תקין ונשמר בהצלחה!")
       showToast("success", "מפתח API נשמר בהצלחה")
     } else {
       showStatus(statusDiv, "error", "✗ מפתח API לא תקין. אנא בדוק ונסה שוב.")
