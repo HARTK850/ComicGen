@@ -123,6 +123,24 @@
                                     </button>
                                 </div>
                             </div>
+                            <div class="form-group">
+                                <label for="project-id">מזהה פרויקט Google Cloud (לVertex AI):</label>
+                                <input type="text" id="project-id" placeholder="your-project-id">
+                                <p style="font-size: 0.85rem; color: #666; margin-top: 4px;">
+                                    <i class="fas fa-info-circle"></i>
+                                    נדרש רק אם אתה משתמש במודלים של Imagen
+                                </p>
+                            </div>
+                            <div class="form-group">
+                                <label for="vertex-location">אזור Vertex AI:</label>
+                                <select id="vertex-location" class="styled-select">
+                                    <option value="us-central1">us-central1 (ברירת מחדל)</option>
+                                    <option value="us-east1">us-east1</option>
+                                    <option value="us-west1">us-west1</option>
+                                    <option value="europe-west1">europe-west1</option>
+                                    <option value="asia-east1">asia-east1</option>
+                                </select>
+                            </div>
                             <button onclick="validateApiKey()" class="btn btn-primary" id="validate-api-btn">
                                 <i class="fas fa-check"></i>
                                 <span id="validate-btn-text">בדוק ושמור</span>
@@ -135,6 +153,12 @@
                                 <li>היכנס ל-<a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a></li>
                                 <li>צור מפתח API חדש</li>
                                 <li>העתק את המפתח והדבק אותו כאן</li>
+                            </ol>
+                            <p style="margin-top: 15px;"><strong>איך להשיג מזהה פרויקט?</strong></p>
+                            <ol>
+                                <li>היכנס ל-<a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></li>
+                                <li>בחר או צור פרויקט</li>
+                                <li>העתק את ה-Project ID</li>
                             </ol>
                         </div>
                     </div>
