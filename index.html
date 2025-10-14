@@ -123,12 +123,13 @@
                                     </button>
                                 </div>
                             </div>
+                            <!-- Updated Project ID field with auto-detection notice -->
                             <div class="form-group">
                                 <label for="project-id">מזהה פרויקט Google Cloud (לVertex AI):</label>
-                                <input type="text" id="project-id" placeholder="your-project-id">
+                                <input type="text" id="project-id" placeholder="יזוהה אוטומטית או הזן ידנית">
                                 <p style="font-size: 0.85rem; color: #666; margin-top: 4px;">
-                                    <i class="fas fa-info-circle"></i>
-                                    נדרש רק אם אתה משתמש במודלים של Imagen
+                                    <i class="fas fa-magic"></i>
+                                    המערכת תנסה לזהות אוטומטית את מזהה הפרויקט כשתבדוק את המפתח
                                 </p>
                             </div>
                             <div class="form-group">
@@ -154,12 +155,12 @@
                                 <li>צור מפתח API חדש</li>
                                 <li>העתק את המפתח והדבק אותו כאן</li>
                             </ol>
-                            <p style="margin-top: 15px;"><strong>איך להשיג מזהה פרויקט?</strong></p>
-                            <ol>
-                                <li>היכנס ל-<a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></li>
-                                <li>בחר או צור פרויקט</li>
-                                <li>העתק את ה-Project ID</li>
-                            </ol>
+                            <!-- Updated help text to mention auto-detection -->
+                            <p style="margin-top: 15px;"><strong>מזהה פרויקט (Project ID)</strong></p>
+                            <p style="font-size: 0.9rem; color: #555;">
+                                המערכת תנסה לזהות אוטומטית את מזהה הפרויקט שלך. 
+                                אם הזיהוי האוטומטי לא יצליח, תוכל להזין ידנית מ-<a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a>.
+                            </p>
                         </div>
                     </div>
                 </div>
