@@ -2,11 +2,9 @@
 // Global State Management
 const AppState = {
   apiKey: localStorage.getItem("gemini_api_key") || "",
-  projectId: localStorage.getItem("gcp_project_id") || "",
-  vertexLocation: localStorage.getItem("vertex_location") || "us-central1",
   backupApiKey: "",
   storyModel: localStorage.getItem("story_model") || "gemini-2.5-flash",
-  imageModel: localStorage.getItem("image_model") || "imagen-3.0-generate-001",
+  imageModel: "gemini-2.5-flash-image-preview",
   currentSection: "home",
   currentProject: null,
   projects: [],
@@ -46,20 +44,13 @@ function initializeApp() {
     localStorage.setItem("projects", "[]")
   }
 
-  // Load saved API key and project ID
+  // Load saved API key
   if (AppState.apiKey) {
     document.getElementById("api-key").value = AppState.apiKey
   }
-  if (AppState.projectId) {
-    document.getElementById("project-id").value = AppState.projectId
-  }
-  if (AppState.vertexLocation) {
-    document.getElementById("vertex-location").value = AppState.vertexLocation
-  }
 
-  // Load saved models
+  // Load saved story model
   document.getElementById("story-model").value = AppState.storyModel
-  document.getElementById("image-model").value = AppState.imageModel
 
   // Initialize star rating
   initializeStarRating()
@@ -119,100 +110,8 @@ function toggleApiKeyVisibility() {
   }
 }
 
-async function autoDetectProjectId(apiKey) {
-  console.log("[v0] Attempting to auto-detect Project ID...")
-
-  // Method 1: Try Cloud Resource Manager API
-  try {
-    const response = await fetch(`https://cloudresourcemanager.googleapis.com/v1/projects?key=${apiKey}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-
-    if (response.ok) {
-      const data = await response.json()
-      if (data.projects && data.projects.length > 0) {
-        const projectId = data.projects[0].projectId
-        console.log("[v0] Project ID detected via Cloud Resource Manager:", projectId)
-        return projectId
-      }
-    }
-  } catch (error) {
-    console.log("[v0] Method 1 failed:", error.message)
-  }
-
-  // Method 2: Try to extract from API key structure (some keys encode project info)
-  try {
-    // API keys sometimes have patterns, but this is not reliable
-    // This is a fallback method
-    const keyParts = apiKey.split("-")
-    if (keyParts.length > 1) {
-      console.log("[v0] Analyzing API key structure...")
-    }
-  } catch (error) {
-    console.log("[v0] Method 2 failed:", error.message)
-  }
-
-  // Method 3: Try Service Usage API
-  try {
-    const response = await fetch(`https://serviceusage.googleapis.com/v1/projects/-/services?key=${apiKey}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-
-    const data = await response.json()
-
-    // Check if error message contains project info
-    if (data.error && data.error.message) {
-      const projectMatch = data.error.message.match(/projects\/([a-z0-9-]+)/i)
-      if (projectMatch && projectMatch[1]) {
-        const projectId = projectMatch[1]
-        console.log("[v0] Project ID detected from error message:", projectId)
-        return projectId
-      }
-    }
-  } catch (error) {
-    console.log("[v0] Method 3 failed:", error.message)
-  }
-
-  // Method 4: Try to get project from Gemini API metadata
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-
-    if (response.ok) {
-      const data = await response.json()
-      // Check response headers for project information
-      const projectHeader = response.headers.get("x-goog-api-client")
-      if (projectHeader) {
-        const projectMatch = projectHeader.match(/project\/([a-z0-9-]+)/i)
-        if (projectMatch && projectMatch[1]) {
-          const projectId = projectMatch[1]
-          console.log("[v0] Project ID detected from headers:", projectId)
-          return projectId
-        }
-      }
-    }
-  } catch (error) {
-    console.log("[v0] Method 4 failed:", error.message)
-  }
-
-  console.log("[v0] Could not auto-detect Project ID")
-  return null
-}
-
 async function validateApiKey() {
   const apiKey = document.getElementById("api-key").value.trim()
-  const projectIdInput = document.getElementById("project-id")
-  const vertexLocation = document.getElementById("vertex-location").value
   const statusDiv = document.getElementById("api-status")
   const btn = document.getElementById("validate-api-btn")
   const btnText = document.getElementById("validate-btn-text")
@@ -251,34 +150,9 @@ async function validateApiKey() {
     )
 
     if (response.ok) {
-      btnText.textContent = "מזהה פרויקט..."
-      const detectedProjectId = await autoDetectProjectId(apiKey)
-
-      if (detectedProjectId) {
-        projectIdInput.value = detectedProjectId
-        AppState.projectId = detectedProjectId
-        localStorage.setItem("gcp_project_id", detectedProjectId)
-        showStatus(statusDiv, "success", `✓ מפתח API תקין! מזהה הפרויקט זוהה אוטומטית: ${detectedProjectId}`)
-      } else {
-        // If auto-detection failed, check if user entered it manually
-        const manualProjectId = projectIdInput.value.trim()
-        if (manualProjectId) {
-          AppState.projectId = manualProjectId
-          localStorage.setItem("gcp_project_id", manualProjectId)
-          showStatus(statusDiv, "success", "✓ מפתח API תקין ונשמר בהצלחה!")
-        } else {
-          showStatus(
-            statusDiv,
-            "warning",
-            "✓ מפתח API תקין! לא ניתן לזהות מזהה פרויקט אוטומטית. אנא הזן ידנית אם אתה משתמש ב-Vertex AI.",
-          )
-        }
-      }
-
+      showStatus(statusDiv, "success", "✓ מפתח API תקין ונשמר בהצלחה!")
       AppState.apiKey = apiKey
-      AppState.vertexLocation = vertexLocation
       localStorage.setItem("gemini_api_key", apiKey)
-      localStorage.setItem("vertex_location", vertexLocation)
       showToast("success", "מפתח API נשמר בהצלחה")
     } else {
       showStatus(statusDiv, "error", "✗ מפתח API לא תקין. אנא בדוק ונסה שוב.")
@@ -302,13 +176,9 @@ function showStatus(element, type, message) {
 
 function saveSettings() {
   const storyModel = document.getElementById("story-model").value
-  const imageModel = document.getElementById("image-model").value
 
   AppState.storyModel = storyModel
-  AppState.imageModel = imageModel
-
   localStorage.setItem("story_model", storyModel)
-  localStorage.setItem("image_model", imageModel)
 
   showToast("success", "ההגדרות נשמרו בהצלחה")
 }
@@ -613,7 +483,6 @@ async function generateComicPages(storyStructure, artStyle, progressElement) {
 
 async function generatePageImage(page, artStyle, title, useBackupKey = false) {
   const apiKey = useBackupKey ? AppState.backupApiKey : AppState.apiKey
-  const model = AppState.imageModel
 
   // Create detailed prompt for the entire page
   let pagePrompt = `Create a complete comic book page in ${getStyleDescription(artStyle)} style.\n`
@@ -632,39 +501,31 @@ async function generatePageImage(page, artStyle, title, useBackupKey = false) {
     pagePrompt += `\n`
   })
 
-  pagePrompt += `\nIMPORTANT: All text must be in Hebrew! Create a professional panel layout with clear speech bubbles and text boxes. Comic book style with clear borders between panels.`
+  pagePrompt += `\nIMPORTANT: All text must be in Hebrew! Create a professional comic book page layout with clear speech bubbles and text boxes. Comic book style with clear borders between panels.`
 
-  if (model.includes("imagen")) {
-    if (!AppState.projectId) {
-      throw new Error("נדרש מזהה פרויקט Google Cloud (Project ID) לשימוש במודלים של Imagen. אנא הזן אותו בהגדרות.")
-    }
-    return await generateWithVertexAI(pagePrompt, apiKey, model)
-  } else {
-    // Use Gemini text generation to create detailed description
-    throw new Error("מודלים של Gemini לא יכולים ליצור תמונות ישירות. אנא השתמש במודל Imagen בהגדרות.")
-  }
+  return await generateImageWithGemini(pagePrompt, apiKey)
 }
 
-async function generateWithVertexAI(prompt, apiKey, model) {
-  const projectId = AppState.projectId
-  const location = AppState.vertexLocation
+async function generateImageWithGemini(prompt, apiKey) {
+  const model = "gemini-2.5-flash-image-preview"
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
-  // Construct Vertex AI endpoint
-  const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:predict?key=${apiKey}`
-
-  console.log("[v0] Calling Vertex AI:", endpoint)
+  console.log("[v0] Calling Gemini 2.5 Flash Image API")
 
   const requestBody = {
-    instances: [
+    contents: [
       {
-        prompt: prompt,
+        parts: [
+          {
+            text: prompt,
+          },
+        ],
       },
     ],
-    parameters: {
-      sampleCount: 1,
-      aspectRatio: "3:4",
-      safetyFilterLevel: "block_some",
-      personGeneration: "allow_all",
+    generationConfig: {
+      temperature: 0.7,
+      topK: 40,
+      topP: 0.95,
     },
   }
 
@@ -678,30 +539,29 @@ async function generateWithVertexAI(prompt, apiKey, model) {
 
   if (!response.ok) {
     const errorText = await response.text()
-    console.error("[v0] Vertex AI error:", errorText)
-    throw new Error(`Vertex AI שגיאה ${response.status}: ${errorText}`)
+    console.error("[v0] Gemini API error:", errorText)
+    throw new Error(`Gemini API שגיאה ${response.status}: ${errorText}`)
   }
 
   const data = await response.json()
-  console.log("[v0] Vertex AI response:", data)
+  console.log("[v0] Gemini response:", data)
 
-  if (data.predictions && data.predictions.length > 0) {
-    const prediction = data.predictions[0]
+  // Extract image from response
+  if (data.candidates && data.candidates.length > 0) {
+    const candidate = data.candidates[0]
 
-    // Handle different response formats
-    if (prediction.bytesBase64Encoded) {
-      return `data:image/png;base64,${prediction.bytesBase64Encoded}`
-    }
-    if (prediction.mimeType && prediction.bytesBase64Encoded) {
-      return `data:${prediction.mimeType};base64,${prediction.bytesBase64Encoded}`
-    }
-    // Some Vertex AI responses might have the image in a different field
-    if (prediction.image && prediction.image.bytesBase64Encoded) {
-      return `data:image/png;base64,${prediction.image.bytesBase64Encoded}`
+    // Check for inline data (base64 image)
+    if (candidate.content && candidate.content.parts) {
+      for (const part of candidate.content.parts) {
+        if (part.inlineData && part.inlineData.data) {
+          const mimeType = part.inlineData.mimeType || "image/png"
+          return `data:${mimeType};base64,${part.inlineData.data}`
+        }
+      }
     }
   }
 
-  throw new Error("לא התקבלה תמונה מ-Vertex AI. בדוק שהמודל והפרויקט מוגדרים נכון.")
+  throw new Error("לא התקבלה תמונה מ-Gemini API. ייתכן שהמודל עדיין לא זמין או שיש בעיה במפתח.")
 }
 
 // Comic Editor Functions
@@ -883,22 +743,33 @@ function loadProjects() {
 }
 
 function toHebrewDate(dateString) {
-  const date = new Date(dateString)
+  try {
+    const date = new Date(dateString)
 
-  // Hebrew months
-  const hebrewMonths = ["תשרי", "חשוון", "כסלו", "טבת", "שבט", "אדר", "ניסן", "אייר", "סיוון", "תמוז", "אב", "אלול"]
+    // Use Hebcal library if available
+    const Hebcal = window.Hebcal || {}
+    if (Hebcal.HDate) {
+      const hDate = new Hebcal.HDate(date)
+      const hebrewDay = hDate.getDate()
+      const hebrewMonth = hDate.getMonthName("h")
+      const hebrewYear = hDate.getFullYear()
 
-  // Simple conversion (this is a basic implementation)
-  // For accurate Hebrew calendar, you'd need a proper library
-  const gregorianYear = date.getFullYear()
-  const hebrewYear = gregorianYear + 3760
-  const month = date.getMonth()
-  const day = date.getDate()
+      return `${hebrewDay} ב${hebrewMonth} ${hebrewYear}`
+    }
 
-  // Approximate Hebrew month (this is simplified)
-  const hebrewMonth = hebrewMonths[month % 12]
+    // Fallback to simple conversion if library not available
+    const hebrewMonths = ["תשרי", "חשוון", "כסלו", "טבת", "שבט", "אדר", "ניסן", "אייר", "סיוון", "תמוז", "אב", "אלול"]
+    const gregorianYear = date.getFullYear()
+    const hebrewYear = gregorianYear + 3760
+    const month = date.getMonth()
+    const day = date.getDate()
+    const hebrewMonth = hebrewMonths[month % 12]
 
-  return `${day} ב${hebrewMonth} ${hebrewYear}`
+    return `${day} ב${hebrewMonth} ${hebrewYear}`
+  } catch (error) {
+    console.error("[v0] Error converting to Hebrew date:", error)
+    return new Date(dateString).toLocaleDateString("he-IL")
+  }
 }
 
 function createProjectCard(project, index) {
@@ -911,7 +782,6 @@ function createProjectCard(project, index) {
   card.className = "project-card"
   card.dataset.projectName = (project.name || "").toLowerCase()
 
-  // Convert to Hebrew date
   const hebrewDate = toHebrewDate(project.createdAt)
 
   card.innerHTML = `
