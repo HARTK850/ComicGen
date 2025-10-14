@@ -4,7 +4,7 @@ const AppState = {
   apiKey: localStorage.getItem("gemini_api_key") || "",
   backupApiKey: "",
   storyModel: localStorage.getItem("story_model") || "gemini-2.5-flash",
-  imageModel: localStorage.getItem("image_model") || "gemini-2.5-flash-image", // החלפה למודל הלא-Preview
+  imageModel: localStorage.getItem("image_model") || "gemini-2.5-flash-preview-image", // המודל הנכון ליצירת תמונות (nano-banana)
   currentSection: "home",
   currentProject: null,
   projects: [],
@@ -12,9 +12,9 @@ const AppState = {
   isGenerating: false,
 }
 
-// בדיקה והחלפה של המודל אם הוא Preview
-if (AppState.imageModel === "gemini-2.5-flash-image-preview") {
-  AppState.imageModel = "gemini-2.5-flash-image";
+// בדיקה והחלפה של המודל אם צריך
+if (AppState.imageModel !== "gemini-2.5-flash-preview-image") {
+  AppState.imageModel = "gemini-2.5-flash-preview-image";
   localStorage.setItem("image_model", AppState.imageModel);
 }
 
@@ -403,7 +403,7 @@ function getStyleDescription(artStyle) {
 async function checkImageGenerationQuota(numberOfPages) {
   // הצג אזהרה אם מספר העמודים גדול מ-10
   if (numberOfPages > 10) {
-    showToast("warning", "מספר עמודים גדול – זה עלול לנצל את המכסה היומית!");
+    showToast("warning", "מספר עמודים גדול – זה עלול לנצל את המכסה היומית!")
   }
   // בדיקה פשוטה של זמינות המודל
   try {
@@ -487,7 +487,7 @@ async function generateComicPages(storyStructure, artStyle, progressElement) {
       }
     }
     // הוספת עיכוב של 2 שניות בין בקשות כדי למנוע חריגה ממגבלת RPM
-    await sleep(2000);
+    await sleep(2000)
   }
 
   return pages
@@ -521,8 +521,8 @@ async function generatePageImage(page, artStyle, title, useBackupKey = false) {
 async function generateImageWithGemini(pagePrompt, useBackup = false) {
   console.log("[v0] Calling Gemini 2.5 Flash Image API")
   const apiKey = useBackup ? AppState.backupApiKey : AppState.apiKey
-  let retryCount = 0;
-  const maxRetries = 3; // מספר ניסיונות חוזרים מקסימלי
+  let retryCount = 0
+  const maxRetries = 3
 
   while (retryCount < maxRetries) {
     try {
@@ -545,50 +545,50 @@ async function generateImageWithGemini(pagePrompt, useBackup = false) {
               temperature: 0.8,
               topK: 40,
               topP: 0.95,
-              responseMimeType: "image/png",
+              // הסרנו responseMimeType – המודל מחזיר JSON עם base64
             },
           }),
         }
-      );
+      )
 
       if (response.status === 429) {
-        const errorData = await response.json();
-        const retryDelay = errorData.error?.details?.find(d => d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo')?.retryDelay || '55s';
-        const delayMs = parseRetryDelay(retryDelay) * 1000; // המר לשניות
-        console.log(`[v0] Rate limit hit, retrying after ${retryDelay}`);
-        await sleep(delayMs);
-        retryCount++;
-        continue;
+        const errorData = await response.json()
+        const retryDelay = errorData.error?.details?.find(d => d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo')?.retryDelay || '55s'
+        const delayMs = parseRetryDelay(retryDelay) * 1000
+        console.log(`[v0] Rate limit hit, retrying after ${retryDelay}`)
+        await sleep(delayMs)
+        retryCount++
+        continue
       }
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API שגיאה ${response.status}: ${errorText}`);
+        const errorText = await response.text()
+        throw new Error(`Gemini API שגיאה ${response.status}: ${errorText}`)
       }
 
-      const data = await response.json();
+      const data = await response.json()
       if (!data.candidates || !data.candidates[0].content.parts[0].inlineData) {
-        throw new Error("No image data in response");
+        throw new Error("No image data in response – בדוק אם המודל תומך ביצירת תמונות")
       }
 
-      const imageData = data.candidates[0].content.parts[0].inlineData.data;
-      return `data:image/png;base64,${imageData}`;
+      const imageData = data.candidates[0].content.parts[0].inlineData.data
+      console.log("[v0] Image generated successfully – base64 length:", imageData.length)
+      return `data:image/png;base64,${imageData}`
     } catch (error) {
-      console.error("[v0] Gemini API error:", error);
+      console.error("[v0] Gemini API error:", error)
       if (retryCount < maxRetries - 1) {
-        await sleep(5000); // עיכוב קצר בין ניסיונות
-        retryCount++;
+        await sleep(5000)
+        retryCount++
       } else {
-        throw error;
+        throw error
       }
     }
   }
-  throw new Error("Exceeded max retries");
+  throw new Error("Exceeded max retries")
 }
 
-// פונקציה עזר להמרת retryDelay (למשל "55s" ל-55)
 function parseRetryDelay(delayStr) {
-  return parseFloat(delayStr.replace('s', '')) || 55;
+  return parseFloat(delayStr.replace('s', '')) || 55
 }
 
 function displayComicInEditor(pages) {
@@ -619,7 +619,7 @@ function displayComicInEditor(pages) {
       img.src = page.imageUrl
       img.alt = `עמוד ${page.pageNumber}`
       img.className = "panel-generated-image"
-      img.loading = "eager" // Force immediate loading, not lazy loading
+      img.loading = "eager"
       img.style.width = "100%"
       img.style.height = "auto"
       img.style.borderRadius = "8px"
@@ -766,27 +766,16 @@ function loadProjects() {
 function toHebrewDate(dateString) {
   try {
     const date = new Date(dateString)
-
-    // Use Hebcal library if available
     const Hebcal = window.Hebcal || {}
     if (Hebcal.HDate) {
       const hDate = new Hebcal.HDate(date)
       const hebrewDay = hDate.getDate()
-      const hebrewMonth = hDate.getMonthName("h")
+      const hebrewMonth = hDate.getMonthName("he")
       const hebrewYear = hDate.getFullYear()
-
       return `${hebrewDay} ב${hebrewMonth} ${hebrewYear}`
     }
-
-    // Fallback to simple conversion if library not available
-    const hebrewMonths = ["תשרי", "חשוון", "כסלו", "טבת", "שבט", "אדר", "ניסן", "אייר", "סיוון", "תמוז", "אב", "אלול"]
-    const gregorianYear = date.getFullYear()
-    const hebrewYear = gregorianYear + 3760
-    const month = date.getMonth()
-    const day = date.getDate()
-    const hebrewMonth = hebrewMonths[month % 12]
-
-    return `${day} ב${hebrewMonth} ${hebrewYear}`
+    // Fallback to Gregorian date if Hebcal is not available
+    return date.toLocaleDateString("he-IL")
   } catch (error) {
     console.error("[v0] Error converting to Hebrew date:", error)
     return new Date(dateString).toLocaleDateString("he-IL")
@@ -809,21 +798,18 @@ function createProjectCard(project, index) {
     <h3>${project.name || "ללא שם"}</h3>
     <p>נוצר ב: ${hebrewDate}</p>
     <p>עמודים: ${project.pages.length}</p>
-    <div class="project-actions">
-      <button class="btn btn-primary" onclick="loadProject(${index})">
-        <i class="fas fa-folder-open"></i>
-        פתח
+    <div class="project-actions" style="display: flex; gap: 10px; margin-top: 10px;">
+      <button class="btn btn-primary" onclick="loadProject(${index})" style="padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        <i class="fas fa-folder-open"></i> פתח
       </button>
-      <button class="btn btn-secondary" onclick="showEditProjectModal(${index})">
-        <i class="fas fa-edit"></i>
-        שנה שם
+      <button class="btn btn-secondary" onclick="showEditProjectModal(${index})" style="padding: 8px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        <i class="fas fa-edit"></i> שנה שם
       </button>
-      <button class="btn btn-secondary" onclick="toggleFavorite(${index})">
+      <button class="btn btn-secondary" onclick="toggleFavorite(${index})" style="padding: 8px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
         <i class="fas fa-star${project.favorite ? "" : "-o"}"></i>
       </button>
-      <button class="btn btn-secondary" onclick="deleteProject(${index})">
-        <i class="fas fa-trash"></i>
-        מחק
+      <button class="btn btn-secondary" onclick="deleteProject(${index})" style="padding: 8px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        <i class="fas fa-trash"></i> מחק
       </button>
     </div>
   `
