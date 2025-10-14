@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@hebcal/core@5/dist/bundle.min.js"></script>
 </head>
 <body>
     <div id="loading-screen" class="loading-screen">
@@ -109,7 +110,6 @@
             <div class="container">
                 <h2><i class="fas fa-cog"></i> הגדרות</h2>
                 
-                <!-- Restructured API section with side-by-side layout -->
                 <div class="settings-section">
                     <h3><i class="fas fa-key"></i> מפתח API</h3>
                     <div class="api-setup-card">
@@ -122,25 +122,6 @@
                                         <i class="fas fa-eye" id="eye-icon"></i>
                                     </button>
                                 </div>
-                            </div>
-                            <!-- Updated Project ID field with auto-detection notice -->
-                            <div class="form-group">
-                                <label for="project-id">מזהה פרויקט Google Cloud (לVertex AI):</label>
-                                <input type="text" id="project-id" placeholder="יזוהה אוטומטית או הזן ידנית">
-                                <p style="font-size: 0.85rem; color: #666; margin-top: 4px;">
-                                    <i class="fas fa-magic"></i>
-                                    המערכת תנסה לזהות אוטומטית את מזהה הפרויקט כשתבדוק את המפתח
-                                </p>
-                            </div>
-                            <div class="form-group">
-                                <label for="vertex-location">אזור Vertex AI:</label>
-                                <select id="vertex-location" class="styled-select">
-                                    <option value="us-central1">us-central1 (ברירת מחדל)</option>
-                                    <option value="us-east1">us-east1</option>
-                                    <option value="us-west1">us-west1</option>
-                                    <option value="europe-west1">europe-west1</option>
-                                    <option value="asia-east1">asia-east1</option>
-                                </select>
                             </div>
                             <button onclick="validateApiKey()" class="btn btn-primary" id="validate-api-btn">
                                 <i class="fas fa-check"></i>
@@ -155,18 +136,12 @@
                                 <li>צור מפתח API חדש</li>
                                 <li>העתק את המפתח והדבק אותו כאן</li>
                             </ol>
-                            <!-- Updated help text to mention auto-detection -->
-                            <p style="margin-top: 15px;"><strong>מזהה פרויקט (Project ID)</strong></p>
-                            <p style="font-size: 0.9rem; color: #555;">
-                                המערכת תנסה לזהות אוטומטית את מזהה הפרויקט שלך. 
-                                אם הזיהוי האוטומטי לא יצליח, תוכל להזין ידנית מ-<a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a>.
-                            </p>
                         </div>
                     </div>
                 </div>
 
                 <div class="settings-section">
-                    <h3>מודל ליצירת הקומיקס</h3>
+                    <h3>מודל ליצירת הסיפור</h3>
                     <div class="form-group">
                         <label for="story-model">בחר מודל:</label>
                         <select id="story-model" class="styled-select">
@@ -176,27 +151,16 @@
                             <option value="gemini-1.5-pro">Gemini 1.5 Pro - מאוזן ומדויק</option>
                             <option value="gemini-exp-1206">Gemini Exp 1206 - דור חדש</option>
                             <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp - דור חדש</option>
-                            <option value="gemini-exp-1121">Gemini Exp 1121 - ניסיוני משופר</option>
                         </select>
                     </div>
                 </div>
                 
-                <!-- Updated image models with more options -->
                 <div class="settings-section">
-                    <h3>מודל ליצירת תמונות קומיקס</h3>
-                    <div class="form-group">
-                        <label for="image-model">בחר מודל:</label>
-                        <select id="image-model" class="styled-select">
-                            <option value="imagen-3.0-generate-001">Imagen 3.0 - איכות מקסימלית (דורש Vertex AI)</option>
-                            <option value="imagen-3.0-fast-generate-001">Imagen 3.0 Fast - מהיר ואיכותי (דורש Vertex AI)</option>
-                            <option value="gemini-2.5-flash">Gemini 2.5 Flash - מומלץ לקומיקס</option>
-                            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp - ניסיוני מתקדם</option>
-                            <option value="gemini-exp-1206">Gemini Exp 1206 - דור חדש</option>
-                        </select>
-                        <p style="font-size: 0.85rem; color: #666; margin-top: 8px;">
-                            <i class="fas fa-info-circle"></i>
-                            שים לב: מודלים של Imagen דורשים הגדרת Vertex AI נפרדת. מומלץ להשתמש במודלים של Gemini.
-                        </p>
+                    <h3>יצירת תמונות קומיקס</h3>
+                    <div class="info-box">
+                        <i class="fas fa-info-circle"></i>
+                        <p>האתר משתמש במודל <strong>Gemini 2.5 Flash Image</strong> (nano-banana) ליצירת תמונות הקומיקס.</p>
+                        <p style="margin-top: 8px; font-size: 0.9rem;">מודל מתקדם שיוצר תמונות איכותיות ישירות דרך Gemini API.</p>
                     </div>
                 </div>
                 
