@@ -4,7 +4,7 @@ const AppState = {
   apiKey: localStorage.getItem("gemini_api_key") || "",
   backupApiKey: "",
   storyModel: localStorage.getItem("story_model") || "gemini-2.5-flash",
-  imageModel: localStorage.getItem("image_model") || "gemini-2.5-flash-preview-image", // המודל הנכון ליצירת תמונות (nano-banana)
+  imageModel: localStorage.getItem("image_model") || "gemini-2.5-flash-image", // השם הרשמי של המודל
   currentSection: "home",
   currentProject: null,
   projects: [],
@@ -13,8 +13,8 @@ const AppState = {
 }
 
 // בדיקה והחלפה של המודל אם צריך
-if (AppState.imageModel !== "gemini-2.5-flash-preview-image") {
-  AppState.imageModel = "gemini-2.5-flash-preview-image";
+if (AppState.imageModel !== "gemini-2.5-flash-image") {
+  AppState.imageModel = "gemini-2.5-flash-image";
   localStorage.setItem("image_model", AppState.imageModel);
 }
 
@@ -545,7 +545,7 @@ async function generateImageWithGemini(pagePrompt, useBackup = false) {
               temperature: 0.8,
               topK: 40,
               topP: 0.95,
-              // הסרנו responseMimeType – המודל מחזיר JSON עם base64
+              // אין responseMimeType – המודל מחזיר JSON עם base64
             },
           }),
         }
