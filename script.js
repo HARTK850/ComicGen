@@ -2,9 +2,11 @@
 // Global State Management
 const AppState = {
   apiKey: localStorage.getItem("gemini_api_key") || "",
+  projectId: localStorage.getItem("gcp_project_id") || "",
+  vertexLocation: localStorage.getItem("vertex_location") || "us-central1",
   backupApiKey: "",
   storyModel: localStorage.getItem("story_model") || "gemini-2.5-flash",
-  imageModel: localStorage.getItem("image_model") || "flux-1.1-pro",
+  imageModel: localStorage.getItem("image_model") || "imagen-3.0-generate-001",
   currentSection: "home",
   currentProject: null,
   projects: [],
@@ -44,9 +46,15 @@ function initializeApp() {
     localStorage.setItem("projects", "[]")
   }
 
-  // Load saved API key
+  // Load saved API key and project ID
   if (AppState.apiKey) {
     document.getElementById("api-key").value = AppState.apiKey
+  }
+  if (AppState.projectId) {
+    document.getElementById("project-id").value = AppState.projectId
+  }
+  if (AppState.vertexLocation) {
+    document.getElementById("vertex-location").value = AppState.vertexLocation
   }
 
   // Load saved models
@@ -113,6 +121,8 @@ function toggleApiKeyVisibility() {
 
 async function validateApiKey() {
   const apiKey = document.getElementById("api-key").value.trim()
+  const projectId = document.getElementById("project-id").value.trim()
+  const vertexLocation = document.getElementById("vertex-location").value
   const statusDiv = document.getElementById("api-status")
   const btn = document.getElementById("validate-api-btn")
   const btnText = document.getElementById("validate-btn-text")
@@ -152,7 +162,11 @@ async function validateApiKey() {
 
     if (response.ok) {
       AppState.apiKey = apiKey
+      AppState.projectId = projectId
+      AppState.vertexLocation = vertexLocation
       localStorage.setItem("gemini_api_key", apiKey)
+      localStorage.setItem("gcp_project_id", projectId)
+      localStorage.setItem("vertex_location", vertexLocation)
       showStatus(statusDiv, "success", "✓ מפתח API תקין ונשמר בהצלחה!")
       showToast("success", "מפתח API נשמר בהצלחה")
     } else {
@@ -509,67 +523,74 @@ async function generatePageImage(page, artStyle, title, useBackupKey = false) {
 
   pagePrompt += `\nIMPORTANT: All text must be in Hebrew! Create a professional panel layout with clear speech bubbles and text boxes. Comic book style with clear borders between panels.`
 
-  // Check if using Imagen models
   if (model.includes("imagen")) {
-    // Try Imagen API (Vertex AI required)
-    try {
-      return await generateWithImagen(pagePrompt, apiKey, model)
-    } catch (error) {
-      throw new Error(
-        `Imagen API שגיאה: ${error.message}. שים לב: Imagen דורש הגדרת Vertex AI. מומלץ להשתמש במודל Gemini בהגדרות.`,
-      )
+    if (!AppState.projectId) {
+      throw new Error("נדרש מזהה פרויקט Google Cloud (Project ID) לשימוש במודלים של Imagen. אנא הזן אותו בהגדרות.")
     }
+    return await generateWithVertexAI(pagePrompt, apiKey, model)
   } else {
     // Use Gemini text generation to create detailed description
-    // Note: Gemini text models cannot generate actual images
-    throw new Error(
-      "מודלים של Gemini לא יכולים ליצור תמונות ישירות. אנא השתמש במודל Imagen או שלב עם שירות חיצוני ליצירת תמונות.",
-    )
+    throw new Error("מודלים של Gemini לא יכולים ליצור תמונות ישירות. אנא השתמש במודל Imagen בהגדרות.")
   }
 }
 
-async function generateWithImagen(prompt, apiKey, model) {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+async function generateWithVertexAI(prompt, apiKey, model) {
+  const projectId = AppState.projectId
+  const location = AppState.vertexLocation
+
+  // Construct Vertex AI endpoint
+  const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:predict?key=${apiKey}`
+
+  console.log("[v0] Calling Vertex AI:", endpoint)
+
+  const requestBody = {
+    instances: [
+      {
+        prompt: prompt,
       },
-      body: JSON.stringify({
-        instances: [
-          {
-            prompt: prompt,
-          },
-        ],
-        parameters: {
-          sampleCount: 1,
-          aspectRatio: "3:4",
-          safetyFilterLevel: "block_some",
-          personGeneration: "allow_all",
-        },
-      }),
+    ],
+    parameters: {
+      sampleCount: 1,
+      aspectRatio: "3:4",
+      safetyFilterLevel: "block_some",
+      personGeneration: "allow_all",
     },
-  )
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  })
 
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(`API error ${response.status}: ${errorText}`)
+    console.error("[v0] Vertex AI error:", errorText)
+    throw new Error(`Vertex AI שגיאה ${response.status}: ${errorText}`)
   }
 
   const data = await response.json()
+  console.log("[v0] Vertex AI response:", data)
 
   if (data.predictions && data.predictions.length > 0) {
     const prediction = data.predictions[0]
+
+    // Handle different response formats
     if (prediction.bytesBase64Encoded) {
       return `data:image/png;base64,${prediction.bytesBase64Encoded}`
     }
     if (prediction.mimeType && prediction.bytesBase64Encoded) {
       return `data:${prediction.mimeType};base64,${prediction.bytesBase64Encoded}`
     }
+    // Some Vertex AI responses might have the image in a different field
+    if (prediction.image && prediction.image.bytesBase64Encoded) {
+      return `data:image/png;base64,${prediction.image.bytesBase64Encoded}`
+    }
   }
 
-  throw new Error("No image data in response")
+  throw new Error("לא התקבלה תמונה מ-Vertex AI. בדוק שהמודל והפרויקט מוגדרים נכון.")
 }
 
 // Comic Editor Functions
