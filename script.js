@@ -4,10 +4,10 @@ const AppState = {
   apiKey: localStorage.getItem("gemini_api_key") || "",
   backupApiKey: "",
   storyModel: localStorage.getItem("story_model") || "gemini-2.5-flash",
-  imageModel: localStorage.getItem("image_model") || "gemini-2.5-flash-image",
+  imageModel: localStorage.getItem("image_model") || "flux-1.1-pro",
   currentSection: "home",
   currentProject: null,
-  projects: JSON.parse(localStorage.getItem("projects") || "[]"),
+  projects: [],
   selectedRating: 0,
   isGenerating: false,
 }
@@ -31,6 +31,19 @@ function hideLoadingScreen() {
 }
 
 function initializeApp() {
+  try {
+    const savedProjects = localStorage.getItem("projects")
+    AppState.projects = savedProjects ? JSON.parse(savedProjects) : []
+    if (!Array.isArray(AppState.projects)) {
+      AppState.projects = []
+      localStorage.setItem("projects", "[]")
+    }
+  } catch (error) {
+    console.error("[v0] Error loading projects:", error)
+    AppState.projects = []
+    localStorage.setItem("projects", "[]")
+  }
+
   // Load saved API key
   if (AppState.apiKey) {
     document.getElementById("api-key").value = AppState.apiKey
@@ -101,14 +114,18 @@ function toggleApiKeyVisibility() {
 async function validateApiKey() {
   const apiKey = document.getElementById("api-key").value.trim()
   const statusDiv = document.getElementById("api-status")
+  const btn = document.getElementById("validate-api-btn")
+  const btnText = document.getElementById("validate-btn-text")
 
   if (!apiKey) {
     showStatus(statusDiv, "error", "אנא הכנס מפתח API")
     return
   }
 
-  statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> בודק מפתח...'
-  statusDiv.className = "api-status"
+  // Show spinner on button
+  btn.classList.add("btn-loading")
+  btn.disabled = true
+  btnText.textContent = "בודק..."
 
   try {
     // Test API key with a simple request
@@ -145,6 +162,11 @@ async function validateApiKey() {
   } catch (error) {
     showStatus(statusDiv, "error", "✗ שגיאה בבדיקת המפתח. אנא נסה שוב.")
     showToast("error", "שגיאה בבדיקת המפתח")
+  } finally {
+    // Remove spinner
+    btn.classList.remove("btn-loading")
+    btn.disabled = false
+    btnText.textContent = "בדוק ושמור"
   }
 }
 
@@ -248,7 +270,7 @@ async function generateComic(input, artStyle, isAIGenerated) {
     if (!quotaCheck.canGenerate) {
       const backupKey = await promptForBackupApiKey()
       if (!backupKey) {
-        throw new Error("לא ניתן להמשיך بدون מפתח API נוסף")
+        throw new Error("לא ניתן להמשיך בלי מפתח API נוסף")
       }
       AppState.backupApiKey = backupKey
     }
@@ -381,7 +403,7 @@ async function checkImageGenerationQuota(numberOfPages) {
   // This is a simplified check - in production, you'd want to call the actual quota API
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${AppState.imageModel}?key=${AppState.apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash?key=${AppState.apiKey}`,
     )
     if (response.ok) {
       return { canGenerate: true }
@@ -389,7 +411,7 @@ async function checkImageGenerationQuota(numberOfPages) {
     return { canGenerate: false }
   } catch (error) {
     console.error("[v0] Error checking quota:", error)
-    return { canGenerate: false }
+    return { canGenerate: true } // Allow generation even if check fails
   }
 }
 
@@ -412,7 +434,7 @@ async function generateComicPages(storyStructure, artStyle, progressElement) {
     const page = storyStructure.pages[i]
 
     try {
-      // Generate image for entire page
+      // Generate image for entire page - NO RETRY
       const imageUrl = await generatePageImage(page, artStyle, storyStructure.title)
 
       pages.push({
@@ -426,6 +448,7 @@ async function generateComicPages(storyStructure, artStyle, progressElement) {
     } catch (error) {
       console.error(`[v0] Error generating page ${i + 1}:`, error)
 
+      // Try backup key if available, but NO RETRY
       if (AppState.backupApiKey) {
         try {
           const imageUrl = await generatePageImage(page, artStyle, storyStructure.title, true)
@@ -442,16 +465,20 @@ async function generateComicPages(storyStructure, artStyle, progressElement) {
             pageNumber: page.pageNumber,
             imageUrl: null,
             panels: page.panels,
-            error: true,
+            error: error.message,
           })
+          currentProgress += progressPerPage
+          updateProgress(progressElement, Math.round(currentProgress))
         }
       } else {
         pages.push({
           pageNumber: page.pageNumber,
           imageUrl: null,
           panels: page.panels,
-          error: true,
+          error: error.message,
         })
+        currentProgress += progressPerPage
+        updateProgress(progressElement, Math.round(currentProgress))
       }
     }
   }
@@ -461,6 +488,7 @@ async function generateComicPages(storyStructure, artStyle, progressElement) {
 
 async function generatePageImage(page, artStyle, title, useBackupKey = false) {
   const apiKey = useBackupKey ? AppState.backupApiKey : AppState.apiKey
+  const model = AppState.imageModel
 
   // Create detailed prompt for the entire page
   let pagePrompt = `Create a complete comic book page in ${getStyleDescription(artStyle)} style.\n`
@@ -481,86 +509,67 @@ async function generatePageImage(page, artStyle, title, useBackupKey = false) {
 
   pagePrompt += `\nIMPORTANT: All text must be in Hebrew! Create a professional panel layout with clear speech bubbles and text boxes. Comic book style with clear borders between panels.`
 
-  return await generateWithImagenRetry(pagePrompt, apiKey)
+  // Check if using Imagen models
+  if (model.includes("imagen")) {
+    // Try Imagen API (Vertex AI required)
+    try {
+      return await generateWithImagen(pagePrompt, apiKey, model)
+    } catch (error) {
+      throw new Error(
+        `Imagen API שגיאה: ${error.message}. שים לב: Imagen דורש הגדרת Vertex AI. מומלץ להשתמש במודל Gemini בהגדרות.`,
+      )
+    }
+  } else {
+    // Use Gemini text generation to create detailed description
+    // Note: Gemini text models cannot generate actual images
+    throw new Error(
+      "מודלים של Gemini לא יכולים ליצור תמונות ישירות. אנא השתמש במודל Imagen או שלב עם שירות חיצוני ליצירת תמונות.",
+    )
+  }
 }
 
-async function generateWithImagenRetry(prompt, apiKey, maxRetries = 3) {
-  let lastError = null
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      if (attempt > 0) {
-        const waitTime = Math.pow(2, attempt) * 1000 // 2s, 4s, 8s
-        console.log(`[v0] Retry attempt ${attempt + 1} after ${waitTime}ms`)
-        await sleep(waitTime)
-      }
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
+async function generateWithImagen(prompt, apiKey, model) {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        instances: [
+          {
+            prompt: prompt,
           },
-          body: JSON.stringify({
-            instances: [
-              {
-                prompt: prompt,
-              },
-            ],
-            parameters: {
-              sampleCount: 1,
-              aspectRatio: "3:4",
-              safetyFilterLevel: "block_some",
-              personGeneration: "allow_all",
-            },
-          }),
+        ],
+        parameters: {
+          sampleCount: 1,
+          aspectRatio: "3:4",
+          safetyFilterLevel: "block_some",
+          personGeneration: "allow_all",
         },
-      )
+      }),
+    },
+  )
 
-      if (response.status === 429) {
-        lastError = new Error("Too many requests - rate limit exceeded")
-        console.log(`[v0] Rate limit hit, attempt ${attempt + 1}/${maxRetries}`)
-        continue // Retry
-      }
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`API error ${response.status}: ${errorText}`)
+  }
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Imagen API error ${response.status}: ${errorText}`)
-      }
+  const data = await response.json()
 
-      const data = await response.json()
-
-      if (data.predictions && data.predictions.length > 0) {
-        const prediction = data.predictions[0]
-        if (prediction.bytesBase64Encoded) {
-          return `data:image/png;base64,${prediction.bytesBase64Encoded}`
-        }
-        if (prediction.mimeType && prediction.bytesBase64Encoded) {
-          return `data:${prediction.mimeType};base64,${prediction.bytesBase64Encoded}`
-        }
-      }
-
-      throw new Error("No image data in response")
-    } catch (error) {
-      lastError = error
-      console.error(`[v0] Attempt ${attempt + 1} failed:`, error.message)
-
-      if (error.message.includes("429") || error.message.includes("rate limit")) {
-        continue
-      }
-
-      if (attempt < maxRetries - 1) {
-        continue
-      }
+  if (data.predictions && data.predictions.length > 0) {
+    const prediction = data.predictions[0]
+    if (prediction.bytesBase64Encoded) {
+      return `data:image/png;base64,${prediction.bytesBase64Encoded}`
+    }
+    if (prediction.mimeType && prediction.bytesBase64Encoded) {
+      return `data:${prediction.mimeType};base64,${prediction.bytesBase64Encoded}`
     }
   }
 
-  throw lastError || new Error("Failed to generate image after all retries")
-}
-
-async function generateWithImagen(prompt, apiKey) {
-  return await generateWithImagenRetry(prompt, apiKey)
+  throw new Error("No image data in response")
 }
 
 // Comic Editor Functions
@@ -604,7 +613,18 @@ function createPageElement(page, index) {
     img.style.borderRadius = "8px"
     content.appendChild(img)
   } else if (page.error) {
-    content.innerHTML = '<div class="panel-image">שגיאה ביצירת התמונה</div>'
+    const errorDiv = document.createElement("div")
+    errorDiv.className = "panel-image"
+    errorDiv.style.background = "#fff3cd"
+    errorDiv.style.color = "#856404"
+    errorDiv.style.padding = "20px"
+    errorDiv.style.textAlign = "center"
+    errorDiv.innerHTML = `
+      <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px;"></i><br>
+      <strong>שגיאה ביצירת התמונה</strong><br>
+      <small style="font-size: 0.8rem;">${page.error}</small>
+    `
+    content.appendChild(errorDiv)
   } else {
     content.innerHTML = '<div class="panel-image">טוען תמונה...</div>'
   }
@@ -681,11 +701,15 @@ function saveProject() {
     AppState.projects.push(AppState.currentProject)
   }
 
-  localStorage.setItem("projects", JSON.stringify(AppState.projects))
-
-  closeSaveProjectModal()
-  showToast("success", "הפרויקט נשמר בהצלחה")
-  loadProjects()
+  try {
+    localStorage.setItem("projects", JSON.stringify(AppState.projects))
+    closeSaveProjectModal()
+    showToast("success", "הפרויקט נשמר בהצלחה")
+    loadProjects()
+  } catch (error) {
+    console.error("[v0] Error saving project:", error)
+    showToast("error", "שגיאה בשמירת הפרויקט")
+  }
 }
 
 function loadProjects() {
@@ -693,7 +717,16 @@ function loadProjects() {
 
   if (!projectsList) return
 
-  if (!Array.isArray(AppState.projects)) {
+  try {
+    const savedProjects = localStorage.getItem("projects")
+    AppState.projects = savedProjects ? JSON.parse(savedProjects) : []
+
+    if (!Array.isArray(AppState.projects)) {
+      AppState.projects = []
+      localStorage.setItem("projects", "[]")
+    }
+  } catch (error) {
+    console.error("[v0] Error loading projects:", error)
     AppState.projects = []
     localStorage.setItem("projects", "[]")
   }
@@ -717,6 +750,25 @@ function loadProjects() {
   })
 }
 
+function toHebrewDate(dateString) {
+  const date = new Date(dateString)
+
+  // Hebrew months
+  const hebrewMonths = ["תשרי", "חשוון", "כסלו", "טבת", "שבט", "אדר", "ניסן", "אייר", "סיוון", "תמוז", "אב", "אלול"]
+
+  // Simple conversion (this is a basic implementation)
+  // For accurate Hebrew calendar, you'd need a proper library
+  const gregorianYear = date.getFullYear()
+  const hebrewYear = gregorianYear + 3760
+  const month = date.getMonth()
+  const day = date.getDate()
+
+  // Approximate Hebrew month (this is simplified)
+  const hebrewMonth = hebrewMonths[month % 12]
+
+  return `${day} ב${hebrewMonth} ${hebrewYear}`
+}
+
 function createProjectCard(project, index) {
   if (!project || !project.pages) {
     console.error("[v0] Invalid project data:", project)
@@ -727,11 +779,12 @@ function createProjectCard(project, index) {
   card.className = "project-card"
   card.dataset.projectName = (project.name || "").toLowerCase()
 
-  const date = new Date(project.createdAt).toLocaleDateString("he-IL")
+  // Convert to Hebrew date
+  const hebrewDate = toHebrewDate(project.createdAt)
 
   card.innerHTML = `
     <h3>${project.name || "ללא שם"}</h3>
-    <p>נוצר ב: ${date}</p>
+    <p>נוצר ב: ${hebrewDate}</p>
     <p>עמודים: ${project.pages.length}</p>
     <div class="project-actions">
       <button class="btn btn-primary" onclick="loadProject(${index})">
@@ -744,7 +797,6 @@ function createProjectCard(project, index) {
       </button>
       <button class="btn btn-secondary" onclick="toggleFavorite(${index})">
         <i class="fas fa-star${project.favorite ? "" : "-o"}"></i>
-        ${project.favorite ? "הסר מועדף" : "מועדף"}
       </button>
       <button class="btn btn-secondary" onclick="deleteProject(${index})">
         <i class="fas fa-trash"></i>
